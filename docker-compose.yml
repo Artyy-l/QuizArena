@@ -1,0 +1,11 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: quizarena_postgres
+    environment:
+      POSTGRES_DB: quizarena
+      POSTGRES_USER: quizuser
+      POSTGRES_PASSWORD: quizpass
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
