@@ -1,5 +1,6 @@
 target/
 !.mvn/wrapper/maven-wrapper.jar
+.mvn/
 !**/src/main/**/target/
 !**/src/test/**/target/
 .kotlin
@@ -13,7 +14,6 @@ target/
 *.iws
 *.iml
 *.ipr
-.mvn/
 
 ### Eclipse ###
 .apt_generated
