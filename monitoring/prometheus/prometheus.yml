@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: quizarena-java
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['app:8081']
+
+  - job_name: quizarena-python
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['llm-service:8000']

@@ -4,11 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Instant;
-
-/**
- * Модель для хранения ответов пользователей на вопросы квиза.
- */
 @Entity
 @Table(name = "user_answers")
 @Getter
@@ -33,24 +28,17 @@ public class UserAnswer {
     @Column(name = "is_correct")
     private Boolean isCorrect;
 
-    @Column(name = "answered_at")
-    private Instant answeredAt;
-
-    @Column(name = "time_spent_seconds")
-    private Integer timeSpentSeconds;
+    @Column(name = "accuracy_ratio")
+    private Double accuracyRatio;
 
     public UserAnswer() {}
 
     public UserAnswer(Long id, UserQuizAttempt attempt, Question question, 
-                     AnswerOption selectedAnswer, Boolean isCorrect, 
-                     Instant answeredAt, Integer timeSpentSeconds) {
+                     AnswerOption selectedAnswer, Boolean isCorrect) {
         this.id = id;
         this.attempt = attempt;
         this.question = question;
         this.selectedAnswer = selectedAnswer;
         this.isCorrect = isCorrect;
-        this.answeredAt = answeredAt;
-        this.timeSpentSeconds = timeSpentSeconds;
     }
 }
-

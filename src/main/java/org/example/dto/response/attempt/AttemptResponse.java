@@ -9,5 +9,6 @@ public record AttemptResponse(
   QuestionDTO currentQuestion,
   Integer questionsRemaining,
   Integer totalQuestions,
-  Integer timeRemaining
+  Integer timeRemaining,
+  Long currentQuestionDeadlineEpochMs
 ) {}

@@ -4,11 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-/**
- * Модель для хранения выбранных вопросов для каждой попытки прохождения квиза.
- * Позволяет сохранить, какие именно вопросы были выбраны для конкретной попытки,
- * что важно для статичных и обновляемых квизов.
- */
 @Entity
 @Table(name = "attempt_questions")
 @Getter
@@ -37,4 +32,3 @@ public class AttemptQuestion {
         this.questionOrder = questionOrder;
     }
 }
-

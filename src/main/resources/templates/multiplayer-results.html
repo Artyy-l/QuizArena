@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты сессии</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .main-content {
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            text-align: center;
+            margin: 0 0 10px 0;
+        }
+
+        .quiz-name {
+            text-align: center;
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-banner {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .status-banner h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .status-banner p,
+        .status-banner li {
+            color: #856404;
+        }
+
+        .status-banner ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 15px 0;
+        }
+
+        .refresh-btn {
+            background: #ffc107;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .leaderboard-table thead {
+            background: #f8f9fa;
+        }
+
+        .leaderboard-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #e9ecef;
+            color: #333;
+        }
+
+        .leaderboard-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .leaderboard-table tbody tr {
+            transition: background 0.2s;
+        }
+
+        .leaderboard-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .rank {
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #667eea;
+            text-align: center;
+            width: 60px;
+            display: inline-block;
+        }
+
+        .rank.first {
+            color: #ffd700;
+        }
+
+        .rank.second {
+            color: #c0c0c0;
+        }
+
+        .rank.third {
+            color: #cd7f32;
+        }
+
+        .player-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .player-score {
+            color: #666;
+            font-weight: bold;
+        }
+
+        .user-row {
+            background: #f0f4ff;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .home-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .home-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 900px) {
+            .leaderboard-table {
+                font-size: 14px;
+            }
+
+            .leaderboard-table th,
+            .leaderboard-table td {
+                padding: 10px;
+            }
+
+            .button-group {
+                margin-top: 24px;
+            }
+
+            .home-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="main-content">
+    <div class="container">
+        <header class="header">
+            <h1>Результаты сессии</h1>
+            <div class="quiz-name" th:text="${quizName != null ? quizName : ''}">Название квиза</div>
+        </header>
+
+        <div class="content-section">
+            <div class="status-banner" th:if="${allCompleted != null and !allCompleted}">
+                <h3>Ожидание других участников</h3>
+                <p>
+                    Завершено: <strong th:text="${completedCount}"></strong> из <strong th:text="${totalParticipants}"></strong> участников
+                </p>
+                <div th:if="${notCompletedUsernames != null and !notCompletedUsernames.isEmpty()}" style="margin-top: 15px;">
+                    <p style="margin-bottom: 5px;">Ещё проходят квиз:</p>
+                    <ul>
+                        <li th:each="username : ${notCompletedUsernames}">
+                            <strong th:text="${username}"></strong>
+                        </li>
+                    </ul>
+                </div>
+                <button class="refresh-btn" onclick="refreshResults()">Обновить результаты</button>
+            </div>
+
+            <table class="leaderboard-table" th:if="${results != null and results.results() != null and !results.results().isEmpty()}">
+                <thead>
+                <tr>
+                    <th>Место</th>
+                    <th>Игрок</th>
+                    <th>Результат</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="result : ${results.results()}"
+                    th:classappend="${results.userPosition() != null and result.position() != null and result.position().equals(results.userPosition())} ? 'user-row' : ''">
+                    <td>
+                        <span class="rank"
+                              th:classappend="${result.position() == 1 ? 'first' : (result.position() == 2 ? 'second' : (result.position() == 3 ? 'third' : ''))}"
+                              th:text="${result.position()}"></span>
+                    </td>
+                    <td class="player-name" th:text="${result.username()}"></td>
+                    <td class="player-score" th:text="${result.score()}"></td>
+                </tr>
+                </tbody>
+            </table>
+
+            <div class="empty-state" th:if="${results == null or results.results() == null or results.results().isEmpty()}">
+                <h3>Результаты отсутствуют</h3>
+            </div>
+
+            <div class="button-group">
+                <button class="home-btn" onclick="goToHome()">На главную</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        var SESSION_ID = /*[[${sessionId}]]*/ '';
+        var USER_ID = /*[[${userId}]]*/ localStorage.getItem('userId') || '';
+
+        window.goToHome = function() {
+            window.location.href = '/home';
+        };
+
+        window.refreshResults = function() {
+            var sessionId = SESSION_ID || '';
+            if (sessionId) {
+                window.location.href = '/multiplayer/session/' + sessionId + '/results';
+            } else {
+                location.reload();
+            }
+        };
+    })();
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 package org.example.dto.request.generation;
 
 import org.example.dto.common.QuizMaterial;
+import org.example.model.QuestionType;
 
 import java.util.List;
 
@@ -9,5 +10,6 @@ public record QuestionGenerationRequest(
   String prompt,
   List<QuizMaterial> materials,
   Integer questionNumber,
-  Integer questionCount
+  Integer questionCount,
+  QuestionType preferredQuestionType
 ) {}

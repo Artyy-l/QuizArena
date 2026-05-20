@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>История прохождений - QuizArena</title>
+    <style>
+        :root {
+            --ink: #0c1026;
+            --muted: #626498;
+            --line: #e8e8f6;
+            --brand: #2f16f4;
+            --brand-soft: #efeaff;
+            --page: #f8f8ff;
+            --green: #2dbb68;
+            --orange: #f49a00;
+            --red: #ff464d;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            color: var(--ink);
+            background: var(--page);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .content {
+            min-width: 0;
+            padding: 0 0 42px;
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            height: 405px;
+            padding: 76px 52px 116px;
+            color: #fff;
+            background-image: linear-gradient(90deg, rgba(3, 6, 31, .96) 0%, rgba(8, 7, 48, .82) 45%, rgba(13, 7, 55, .42) 100%), url('/images/space.png');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .hero h1,
+        .hero p {
+            position: relative;
+            z-index: 6;
+            max-width: 620px;
+        }
+
+        .hero h1 {
+            font-size: clamp(38px, 4vw, 58px);
+            line-height: 1.02;
+            letter-spacing: 0;
+        }
+
+        .hero p {
+            margin-top: 24px;
+            font-size: 20px;
+            line-height: 1.55;
+        }
+
+        .hero-line {
+            position: relative;
+            z-index: 6;
+            width: 260px;
+            height: 2px;
+            margin-top: 28px;
+            background: linear-gradient(90deg, #ff4fff, #b18bff, rgba(255, 255, 255, 0));
+            box-shadow: 0 0 18px rgba(196, 99, 255, .75);
+        }
+
+        .hero-line::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 36%;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 0 24px #b18bff;
+            transform: translateY(-50%);
+        }
+
+        .hero-side-planet {
+            position: absolute;
+            z-index: 1;
+            right: clamp(470px, 35vw, 640px);
+            bottom: 162px;
+            width: min(280px, 19vw);
+            opacity: .82;
+            filter: drop-shadow(0 16px 24px rgba(117, 35, 224, .36));
+            pointer-events: none;
+        }
+
+        .hero-visual {
+            position: absolute;
+            right: clamp(0px, 4vw, 58px);
+            bottom: -104px;
+            width: min(720px, 54vw);
+            height: min(500px, 38vw);
+            pointer-events: none;
+        }
+
+        .hero-visual::after {
+            content: "";
+            position: absolute;
+            z-index: 3;
+            left: 50%;
+            bottom: 35%;
+            width: 26%;
+            height: 5%;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at center, rgba(0, 0, 0, .78) 0%, rgba(18, 0, 46, .5) 44%, rgba(98, 30, 190, .14) 70%, rgba(98, 30, 190, 0) 100%);
+            transform: translateX(-50%);
+            filter: blur(6px);
+            opacity: .78;
+        }
+
+        .hero-planet-base {
+            position: absolute;
+            z-index: 1;
+            left: 50%;
+            bottom: 0;
+            width: 126%;
+            transform: translateX(-50%);
+            filter: saturate(1.2) contrast(1.08) drop-shadow(0 20px 30px rgba(84, 26, 224, .42));
+        }
+
+        .hero-clock {
+            position: absolute;
+            z-index: 4;
+            left: 50%;
+            bottom: 30%;
+            width: 48%;
+            transform: translateX(-50%);
+            filter: drop-shadow(0 24px 28px rgba(84, 26, 224, .58));
+        }
+
+        .toolbar {
+            position: relative;
+            z-index: 8;
+            display: grid;
+            gap: 16px;
+            width: calc(100% - 88px);
+            margin: -40px auto 0;
+        }
+
+        .toolbar-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: min(560px, 100%);
+            min-height: 58px;
+            padding: 0 18px;
+            border: 1px solid #e2e0f5;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 14px 28px rgba(27, 24, 83, .06);
+        }
+
+        .search-icon {
+            flex: 0 0 auto;
+            width: 24px;
+            height: 24px;
+            color: var(--brand);
+            stroke-width: 2.5;
+        }
+
+        .filter-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 0 0 auto;
+        }
+
+        .filter-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 230px;
+            min-height: 58px;
+            padding: 0 16px;
+            border: 1px solid #e2e0f5;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 14px 28px rgba(27, 24, 83, .06);
+        }
+
+        .sort-wrap {
+            min-width: 290px;
+        }
+
+        .filter-icon,
+        .sort-direction-icon {
+            flex: 0 0 auto;
+            width: 24px;
+            height: 24px;
+            color: var(--brand);
+            stroke-width: 2.5;
+        }
+
+        .filter-select {
+            width: 100%;
+            border: 0;
+            outline: 0;
+            color: #29246e;
+            background: transparent;
+            font-size: 18px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .sort-direction-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 58px;
+            height: 58px;
+            border: 1px solid #e2e0f5;
+            border-radius: 8px;
+            color: var(--brand);
+            background: #fff;
+            cursor: pointer;
+            box-shadow: 0 14px 28px rgba(27, 24, 83, .06);
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+
+        .sort-direction-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 32px rgba(47, 22, 244, .14);
+        }
+
+        .search-input {
+            width: 100%;
+            min-width: 0;
+            border: 0;
+            outline: 0;
+            color: #26226f;
+            background: transparent;
+            font-size: 18px;
+        }
+
+        .search-input::placeholder {
+            color: #8a8abc;
+        }
+
+        .mode-toggle {
+            display: inline-grid;
+            grid-template-columns: 1fr 1fr;
+            width: min(390px, 100%);
+            min-height: 54px;
+            padding: 4px;
+            border: 1px solid #dcd8f5;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 12px 24px rgba(27, 24, 83, .05);
+        }
+
+        .mode-btn {
+            border: 0;
+            border-radius: 8px;
+            color: #312c91;
+            background: transparent;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .mode-btn.active {
+            color: var(--brand);
+            background: var(--brand-soft);
+        }
+
+        .history-list {
+            display: grid;
+            gap: 10px;
+            width: calc(100% - 88px);
+            margin: 18px auto 0;
+            list-style: none;
+        }
+
+        .history-card {
+            display: grid;
+            grid-template-columns: minmax(280px, 1fr) 84px 130px minmax(150px, .55fr) minmax(170px, .52fr) auto;
+            align-items: center;
+            gap: 22px;
+            min-height: 122px;
+            padding: 20px 24px 20px 20px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 16px 34px rgba(27, 24, 83, .06);
+            transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+        }
+
+        .history-card:hover {
+            transform: translateY(-2px);
+            border-color: #dcd5ff;
+            box-shadow: 0 20px 38px rgba(27, 24, 83, .09);
+        }
+
+        .attempt-card {
+            grid-template-columns: minmax(280px, 1fr) 84px 130px minmax(170px, .52fr) auto;
+            cursor: pointer;
+        }
+
+        .quiz-main {
+            min-width: 0;
+            cursor: pointer;
+        }
+
+        .quiz-title {
+            overflow: hidden;
+            color: var(--ink);
+            font-size: 20px;
+            font-weight: 900;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .quiz-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 12px;
+            color: #7476bd;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .quiz-stat,
+        .date-stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-icon {
+            width: 20px;
+            height: 20px;
+            color: #7476bd;
+            stroke-width: 2.4;
+        }
+
+        .accuracy-ring {
+            --tone: var(--green);
+            display: grid;
+            place-items: center;
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            color: var(--ink);
+            font-size: 15px;
+            font-weight: 900;
+            background:
+                radial-gradient(circle at center, #fff 57%, transparent 59%),
+                conic-gradient(var(--tone) calc(var(--value) * 1%), #ececf6 0);
+        }
+
+        .accuracy-ring.medium {
+            --tone: var(--orange);
+        }
+
+        .accuracy-ring.low {
+            --tone: var(--red);
+        }
+
+        .best-score {
+            display: grid;
+            gap: 6px;
+            color: #7476bd;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .best-score strong {
+            color: var(--ink);
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .best-score span span {
+            color: #7476bd;
+            font-size: 14px;
+        }
+
+        .sparkline {
+            width: 170px;
+            height: 60px;
+        }
+
+        .sparkline.good {
+            color: var(--green);
+        }
+
+        .sparkline.medium {
+            color: var(--orange);
+        }
+
+        .sparkline.low {
+            color: var(--red);
+        }
+
+        .sparkline svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .spark-fill {
+            fill: currentColor;
+            opacity: .12;
+        }
+
+        .spark-line {
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .spark-dot {
+            fill: currentColor;
+        }
+
+        .date-stat {
+            color: #7476bd;
+            font-size: 14px;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        .date-stat strong {
+            display: block;
+            color: #4a4d82;
+            font-size: 15px;
+        }
+
+        .play-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+            padding: 0 22px;
+            border: 1px solid #dcd8f5;
+            border-radius: 8px;
+            color: var(--brand);
+            background: #fff;
+            font-weight: 900;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
+        }
+
+        .play-btn:hover {
+            transform: translateY(-2px);
+            background: var(--brand-soft);
+            box-shadow: 0 14px 28px rgba(27, 24, 83, .08);
+        }
+
+        .empty-state {
+            display: grid;
+            justify-items: center;
+            gap: 12px;
+            width: calc(100% - 88px);
+            margin: 18px auto 0;
+            padding: 54px 24px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            color: #6a6c9f;
+            background: #fff;
+            text-align: center;
+        }
+
+        .empty-icon {
+            width: 46px;
+            height: 46px;
+            color: var(--brand);
+            stroke-width: 2.2;
+        }
+
+        .empty-state strong {
+            color: var(--ink);
+            font-size: 22px;
+        }
+
+        .pagination-wrap {
+            display: grid;
+            justify-items: center;
+            gap: 8px;
+            width: calc(100% - 88px);
+            margin: 24px auto 0;
+        }
+
+        .pagination-summary {
+            color: #4d4a91;
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .pagination-summary strong {
+            color: #17145b;
+            font-weight: 900;
+        }
+
+        .pagination {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .page-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-width: 46px;
+            min-height: 46px;
+            padding: 0 16px;
+            border: 0;
+            border-radius: 8px;
+            color: #29246e;
+            background: #fff;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 10px 22px rgba(27, 24, 83, .08);
+            transition: color .18s ease, background-color .18s ease, opacity .18s ease;
+        }
+
+        .page-btn:hover,
+        .page-btn.active {
+            color: #fff;
+            background: var(--brand);
+        }
+
+        .page-btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .page-icon {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2.4;
+        }
+
+        .page-ellipsis {
+            display: inline-flex;
+            align-items: center;
+            min-height: 46px;
+            padding: 0 4px;
+            color: #29246e;
+            font-weight: 900;
+        }
+
+        @media (max-width: 1320px) {
+            .history-card {
+                grid-template-columns: minmax(260px, 1fr) 84px 120px minmax(160px, .5fr) auto;
+            }
+
+            .attempt-card {
+                grid-template-columns: minmax(260px, 1fr) 84px 120px minmax(160px, .5fr) auto;
+            }
+
+            .sparkline {
+                display: none;
+            }
+        }
+
+        @media (max-width: 1080px) {
+            .hero {
+                height: 405px;
+                padding: 56px 36px 102px;
+            }
+
+            .hero-visual {
+                opacity: .7;
+            }
+
+            .toolbar,
+            .history-list,
+            .empty-state,
+            .pagination-wrap {
+                width: calc(100% - 56px);
+            }
+
+            .toolbar-row {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .search-box,
+            .mode-toggle {
+                width: 100%;
+            }
+
+            .filter-controls {
+                width: 100%;
+            }
+
+            .filter-wrap {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .history-card {
+                grid-template-columns: 1fr 84px 120px;
+            }
+
+            .attempt-card {
+                grid-template-columns: 1fr 84px 120px;
+            }
+
+            .date-stat,
+            .play-btn {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hero {
+                height: 300px;
+                padding: 42px 24px 86px;
+            }
+
+            .hero h1 {
+                font-size: 42px;
+            }
+
+            .hero-visual {
+                right: -70px;
+                bottom: -60px;
+                width: 360px;
+                height: 260px;
+                opacity: .42;
+            }
+
+            .hero-side-planet {
+                display: none;
+            }
+
+            .toolbar,
+            .history-list,
+            .empty-state,
+            .pagination-wrap {
+                width: calc(100% - 32px);
+            }
+
+            .history-card {
+                grid-template-columns: 1fr;
+            }
+
+            .attempt-card {
+                grid-template-columns: 1fr;
+            }
+
+            .accuracy-ring {
+                width: 62px;
+                height: 62px;
+            }
+
+            .quiz-meta {
+                gap: 10px;
+                font-size: 14px;
+            }
+
+            .page-btn span {
+                display: none;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="/css/sidebar.css">
+</head>
+<body>
+<div class="page">
+    <aside th:replace="~{fragments/sidebar :: sidebar('history')}"></aside>
+
+    <main class="content">
+        <section class="hero">
+            <h1>История прохождений</h1>
+            <div class="hero-line" aria-hidden="true"></div>
+            <p>Сохраняйте результаты, сравнивайте прошлые попытки и возвращайтесь к любимым квизам.</p>
+            <img class="hero-side-planet" src="/images/planet.png" alt="">
+            <div class="hero-visual" aria-hidden="true">
+                <img class="hero-planet-base" src="/images/planet_under_trophy.png" alt="">
+                <img class="hero-clock" src="/images/clock.png" alt="">
+            </div>
+        </section>
+
+        <section class="toolbar" aria-label="Фильтры истории">
+            <div class="toolbar-row">
+                <label class="search-box" for="searchInput">
+                    <i class="search-icon" data-lucide="search" aria-hidden="true"></i>
+                    <input class="search-input" id="searchInput" type="text" placeholder="Поиск квизов..." th:value="${search}">
+                </label>
+                <div class="filter-controls">
+                    <label class="filter-wrap" for="visibilitySelect">
+                        <i class="filter-icon" data-lucide="list-filter" aria-hidden="true"></i>
+                        <select class="filter-select" id="visibilitySelect" onchange="applyFilters()">
+                            <option value="all" th:selected="${visibility == 'all'}">Все квизы</option>
+                            <option value="public" th:selected="${visibility == 'public'}">Публичные</option>
+                            <option value="private" th:selected="${visibility == 'private'}">Приватные</option>
+                        </select>
+                    </label>
+                    <label class="filter-wrap sort-wrap" for="sortSelect">
+                        <i class="filter-icon" data-lucide="list-filter" aria-hidden="true"></i>
+                        <select class="filter-select" id="sortSelect" onchange="applyFilters()">
+                            <option value="latest" th:selected="${sort == 'latest'}"
+                                    th:text="${historyView == 'attempts' ? 'Дата попытки' : 'Дата последней попытки'}">Дата последней попытки</option>
+                            <option value="accuracy" th:selected="${sort == 'accuracy'}"
+                                    th:text="${historyView == 'attempts' ? 'Точность' : 'Лучшая точность'}">Лучшая точность</option>
+                            <option value="score" th:selected="${sort == 'score'}"
+                                    th:text="${historyView == 'attempts' ? 'Результат' : 'Лучший результат'}">Лучший результат</option>
+                        </select>
+                    </label>
+                    <button class="sort-direction-btn" type="button" onclick="toggleSortDirection()" aria-label="Сменить порядок сортировки">
+                        <i class="sort-direction-icon"
+                           th:attr="data-lucide=${direction == 'asc' ? 'arrow-up-wide-narrow' : 'arrow-down-wide-narrow'}"
+                           aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="mode-toggle" aria-label="Режим истории">
+                <button class="mode-btn" th:classappend="${historyView == 'quizzes'} ? 'active' : ''" type="button" onclick="setHistoryView('quizzes')">По квизам</button>
+                <button class="mode-btn" th:classappend="${historyView == 'attempts'} ? 'active' : ''" type="button" onclick="setHistoryView('attempts')">По попыткам</button>
+            </div>
+        </section>
+
+        <ul class="history-list" th:if="${historyView == 'quizzes' and historyQuizzes != null and !historyQuizzes.isEmpty()}">
+            <li class="history-card" th:each="card : ${historyQuizzes}">
+                <div class="quiz-main" th:onclick="'goToQuiz(' + ${card.quizId} + ')'">
+                    <div class="quiz-title" th:text="${card.quizName}">Космос: за гранью</div>
+                    <div class="quiz-meta">
+                        <span class="quiz-stat">
+                            <i class="stat-icon" data-lucide="file-text" aria-hidden="true"></i>
+                            <span th:text="${card.questionCount} + ' вопросов'">50 вопросов</span>
+                        </span>
+                        <span class="quiz-stat">
+                            <i class="stat-icon" data-lucide="clock" aria-hidden="true"></i>
+                            <span th:text="${card.timeLimit != null and card.timeLimit > 0 ? (card.timeLimit < 60 ? card.timeLimit + ' сек' : T(java.lang.Math).ceil(card.timeLimit / 60.0).intValue() + ' мин') : 'Без лимита'}">2 мин</span>
+                        </span>
+                        <span class="quiz-stat">
+                            <i class="stat-icon" th:attr="data-lucide=${card.isPublic ? 'globe' : 'lock'}" aria-hidden="true"></i>
+                            <span th:text="${card.isPublic ? 'Публичный' : 'Приватный'}">Публичный</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="accuracy-ring"
+                     th:classappend="${card.accuracyTone}"
+                     th:style="'--value:' + ${card.bestAccuracy}"
+                     th:text="${card.bestAccuracy} + '%'">92%</div>
+
+                <div class="best-score">
+                    <strong><span th:text="${card.bestScore}">46</span><span> / </span><span th:text="${card.questionCount}">50</span></strong>
+                    <span>Лучший результат</span>
+                </div>
+
+                <div class="sparkline" th:classappend="${card.accuracyTone}">
+                    <svg viewBox="0 0 170 60" preserveAspectRatio="none" aria-hidden="true">
+                        <polyline class="spark-line" th:attr="points=${card.graphPoints}" points="0,45 20,35 40,38 60,22 80,28 100,18 120,26 140,20 160,22"></polyline>
+                        <circle class="spark-dot" r="3"
+                                th:each="point,iter : ${card.accuracySeries}"
+                                th:if="${iter.last}"
+                                cx="160"
+                                th:attr="cy=${52 - point * 0.48}"></circle>
+                    </svg>
+                </div>
+
+                <div class="date-stat">
+                    <i class="stat-icon" data-lucide="calendar-days" aria-hidden="true"></i>
+                    <span>
+                        <span>Последняя попытка</span>
+                        <strong th:text="${card.lastAttemptAt != null ? #temporals.format(card.lastAttemptAt, 'dd.MM.yyyy HH:mm') : '-'}">Сегодня, 15:47</strong>
+                    </span>
+                </div>
+
+                <a class="play-btn" th:href="@{/quiz/{id}(id=${card.quizId})}">Сыграть ещё раз</a>
+            </li>
+        </ul>
+
+        <ul class="history-list" th:if="${historyView == 'attempts' and historyAttempts != null and !historyAttempts.isEmpty()}">
+            <li class="history-card attempt-card" th:each="card : ${historyAttempts}" th:onclick="'goToQuiz(' + ${card.quizId} + ')'">
+                <div class="quiz-main">
+                    <div class="quiz-title" th:text="${card.quizName}">Космос: за гранью</div>
+                    <div class="quiz-meta">
+                        <span class="quiz-stat">
+                            <i class="stat-icon" data-lucide="file-text" aria-hidden="true"></i>
+                            <span th:text="${card.questionCount} + ' вопросов'">50 вопросов</span>
+                        </span>
+                        <span class="quiz-stat">
+                            <i class="stat-icon" data-lucide="clock" aria-hidden="true"></i>
+                            <span th:text="${card.timeLimit != null and card.timeLimit > 0 ? (card.timeLimit < 60 ? card.timeLimit + ' сек' : T(java.lang.Math).ceil(card.timeLimit / 60.0).intValue() + ' мин') : 'Без лимита'}">2 мин</span>
+                        </span>
+                        <span class="quiz-stat">
+                            <i class="stat-icon" th:attr="data-lucide=${card.isPublic ? 'globe' : 'lock'}" aria-hidden="true"></i>
+                            <span th:text="${card.isPublic ? 'Публичный' : 'Приватный'}">Публичный</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="accuracy-ring"
+                     th:classappend="${card.accuracyTone}"
+                     th:style="'--value:' + ${card.accuracy}"
+                     th:text="${card.accuracy} + '%'">92%</div>
+
+                <div class="best-score">
+                    <strong><span th:text="${card.score}">46</span><span> / </span><span th:text="${card.questionCount}">50</span></strong>
+                    <span>Результат попытки</span>
+                </div>
+
+                <div class="date-stat">
+                    <i class="stat-icon" data-lucide="calendar-days" aria-hidden="true"></i>
+                    <span>
+                        <span>Дата попытки</span>
+                        <strong th:text="${card.attemptAt != null ? #temporals.format(card.attemptAt, 'dd.MM.yyyy HH:mm') : '-'}">Сегодня, 15:47</strong>
+                    </span>
+                </div>
+
+                <a class="play-btn" th:href="@{/quiz/{id}(id=${card.quizId})}" onclick="event.stopPropagation()">Открыть квиз</a>
+            </li>
+        </ul>
+
+        <div class="empty-state" th:if="${totalElements == null or totalElements == 0}">
+            <i class="empty-icon" data-lucide="history" aria-hidden="true"></i>
+            <strong>История пустая</strong>
+            <span>Пройдите квиз, и он появится здесь.</span>
+        </div>
+
+        <div class="pagination-wrap" th:if="${totalElements != null and totalElements > 0}">
+            <div class="pagination-summary">
+                Показано
+                <strong th:text="${shownFrom}">1</strong><span>-</span><strong th:text="${shownTo}">5</strong>
+                из <strong th:text="${totalElements}">7</strong>
+                <span th:text="${historyView == 'attempts' ? 'попыток' : 'квизов'}">квизов</span>
+            </div>
+            <div class="pagination" th:if="${totalPages > 1}">
+                <button class="page-btn" type="button" th:disabled="${currentPage <= 0}" th:onclick="'goToPage(' + ${currentPage - 1} + ')'">
+                    <i class="page-icon" data-lucide="arrow-left" aria-hidden="true"></i>
+                    <span>Назад</span>
+                </button>
+                <button class="page-btn" type="button"
+                        th:classappend="${currentPage == 0 ? 'active' : ''}"
+                        th:onclick="'goToPage(0)'">1</button>
+                <button class="page-btn" type="button"
+                        th:if="${totalPages >= 2}"
+                        th:classappend="${currentPage == 1 ? 'active' : ''}"
+                        th:onclick="'goToPage(1)'">2</button>
+                <button class="page-btn" type="button"
+                        th:if="${totalPages >= 3}"
+                        th:classappend="${currentPage == 2 ? 'active' : ''}"
+                        th:onclick="'goToPage(2)'">3</button>
+                <span class="page-ellipsis" th:if="${totalPages > 4}">...</span>
+                <button class="page-btn" type="button"
+                        th:if="${totalPages > 3}"
+                        th:classappend="${currentPage == totalPages - 1 ? 'active' : ''}"
+                        th:onclick="'goToPage(' + ${totalPages - 1} + ')'"
+                        th:text="${totalPages}">8</button>
+                <button class="page-btn" type="button" th:disabled="${currentPage >= totalPages - 1}" th:onclick="'goToPage(' + ${currentPage + 1} + ')'">
+                    <span>Вперёд</span>
+                    <i class="page-icon" data-lucide="arrow-right" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+
+    document.getElementById('searchInput')?.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            applyFilters();
+        }
+    });
+
+    function toggleSortDirection() {
+        const currentDirection = new URLSearchParams(window.location.search).get('direction') || 'desc';
+        applyFilters(currentDirection === 'asc' ? 'desc' : 'asc');
+    }
+
+    function getCurrentView() {
+        return new URLSearchParams(window.location.search).get('view') || 'quizzes';
+    }
+
+    function setHistoryView(view) {
+        applyFilters(null, view);
+    }
+
+    function applyFilters(directionOverride, viewOverride) {
+        const params = new URLSearchParams();
+        const search = document.getElementById('searchInput')?.value.trim();
+        const visibility = document.getElementById('visibilitySelect')?.value || 'all';
+        const sort = document.getElementById('sortSelect')?.value || 'latest';
+        const direction = directionOverride || new URLSearchParams(window.location.search).get('direction') || 'desc';
+        const view = viewOverride || getCurrentView();
+        if (search) {
+            params.set('search', search);
+        }
+        if (view !== 'quizzes') {
+            params.set('view', view);
+        }
+        if (visibility !== 'all') {
+            params.set('visibility', visibility);
+        }
+        if (sort !== 'latest') {
+            params.set('sort', sort);
+        }
+        if (direction !== 'desc') {
+            params.set('direction', direction);
+        }
+        const query = params.toString();
+        window.location.href = '/history' + (query ? '?' + query : '');
+    }
+
+    function goToPage(page) {
+        const params = new URLSearchParams();
+        const search = document.getElementById('searchInput')?.value.trim();
+        const visibility = document.getElementById('visibilitySelect')?.value || 'all';
+        const sort = document.getElementById('sortSelect')?.value || 'latest';
+        const direction = new URLSearchParams(window.location.search).get('direction') || 'desc';
+        const view = getCurrentView();
+        if (search) {
+            params.set('search', search);
+        }
+        if (view !== 'quizzes') {
+            params.set('view', view);
+        }
+        if (visibility !== 'all') {
+            params.set('visibility', visibility);
+        }
+        if (sort !== 'latest') {
+            params.set('sort', sort);
+        }
+        if (direction !== 'desc') {
+            params.set('direction', direction);
+        }
+        if (page > 0) {
+            params.set('page', page);
+        }
+        const query = params.toString();
+        window.location.href = '/history' + (query ? '?' + query : '');
+    }
+
+    function goToQuiz(quizId) {
+        window.location.href = '/quiz/' + quizId;
+    }
+</script>
+</body>
+</html>

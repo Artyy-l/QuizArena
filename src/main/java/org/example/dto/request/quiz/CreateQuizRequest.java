@@ -1,6 +1,7 @@
 package org.example.dto.request.quiz;
 
 import org.example.dto.common.QuizMaterial;
+import org.example.model.QuestionType;
 
 import java.util.List;
 
@@ -13,5 +14,6 @@ public record CreateQuizRequest(
   Integer questionNumber,
   Integer timeLimit,
   Boolean isPrivate,
-  Boolean isStatic
+  Boolean isStatic,
+  QuestionType defaultQuestionType
 ) {}

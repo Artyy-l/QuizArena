@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты квиза</title>
+    <style>
+        :root {
+            --ink: #0c1026;
+            --muted: #585a8a;
+            --line: #e8e8f6;
+            --brand: #2f16f4;
+            --brand-soft: #efeaff;
+            --green: #0c941f;
+            --orange: #f49a00;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            color: var(--ink);
+            background: #f8f8ff;
+        }
+
+
+        .primary-btn,
+        .outline-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 48px;
+            border-radius: 8px;
+            border: 0;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease, color .18s ease;
+        }
+
+        .primary-btn {
+            color: #fff;
+            background: var(--brand);
+            box-shadow: 0 14px 30px rgba(47, 22, 244, .22);
+        }
+
+        .content {
+            min-width: 0;
+            padding-bottom: 40px;
+        }
+
+        .hero {
+            position: relative;
+            z-index: 0;
+            min-height: 405px;
+            overflow: hidden;
+            color: #fff;
+            background-image: linear-gradient(90deg, rgba(3, 6, 31, .96) 0%, rgba(8, 7, 48, .82) 45%, rgba(13, 7, 55, .45) 100%), url('/images/space.png');
+            background-size: cover;
+            background-position: center;
+            padding: 34px 52px 106px;
+        }
+
+        .hero h1 {
+            position: relative;
+            z-index: 6;
+            max-width: 760px;
+            margin-top: 14px;
+            font-size: clamp(30px, 4vw, 48px);
+            line-height: 1.05;
+        }
+
+        .eyebrow {
+            position: relative;
+            z-index: 6;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .meta {
+            position: relative;
+            z-index: 6;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+
+        .meta span {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .meta-icon {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2.2;
+        }
+
+        .hero-visual {
+            position: absolute;
+            right: clamp(0px, 4vw, 58px);
+            bottom: -74px;
+            width: min(720px, 54vw);
+            height: min(500px, 38vw);
+            pointer-events: none;
+        }
+
+        .hero-side-planet {
+            position: absolute;
+            z-index: 1;
+            right: clamp(470px, 35vw, 640px);
+            bottom: 162px;
+            width: min(280px, 19vw);
+            opacity: .82;
+            filter: drop-shadow(0 16px 24px rgba(117, 35, 224, .36));
+            pointer-events: none;
+        }
+
+        .hero-visual::after {
+            content: "";
+            position: absolute;
+            z-index: 3;
+            left: 50%;
+            bottom: 35%;
+            width: 26%;
+            height: 5%;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at center, rgba(0, 0, 0, .78) 0%, rgba(18, 0, 46, .5) 44%, rgba(98, 30, 190, .14) 70%, rgba(98, 30, 190, 0) 100%);
+            transform: translateX(-50%);
+            filter: blur(6px);
+            opacity: .78;
+        }
+
+        .hero-planet {
+            position: absolute;
+            z-index: 1;
+            left: 50%;
+            bottom: 0;
+            width: 126%;
+            transform: translateX(-50%);
+            filter: saturate(1.2) contrast(1.08) drop-shadow(0 20px 30px rgba(84, 26, 224, .42));
+        }
+
+        .hero-trophy {
+            position: absolute;
+            z-index: 4;
+            left: 50%;
+            bottom: 34%;
+            width: 48%;
+            transform: translateX(-50%);
+            filter: drop-shadow(0 24px 28px rgba(84, 26, 224, .58));
+        }
+
+        .score-card {
+            position: relative;
+            z-index: 6;
+            width: min(300px, 44vw);
+            margin-top: 26px;
+            padding: 26px 34px 22px;
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 8px;
+            background: rgba(29, 24, 85, .82);
+            box-shadow: 0 24px 50px rgba(0, 0, 0, .28);
+            backdrop-filter: blur(8px);
+        }
+
+        .score-label {
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .score-line {
+            display: flex;
+            align-items: baseline;
+            gap: 14px;
+            margin-top: 8px;
+        }
+
+        .score-number {
+            font-size: 86px;
+            line-height: .95;
+            font-weight: 900;
+        }
+
+        .score-word {
+            font-size: 23px;
+            font-weight: 900;
+        }
+
+        .stake-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 36px;
+            margin-top: 18px;
+            padding: 8px 22px;
+            border-radius: 999px;
+            color: #14142f;
+            background: #fff;
+            font-weight: 900;
+            box-shadow: inset 0 0 0 1px #e8e8f6;
+        }
+
+        .stats {
+            position: relative;
+            z-index: 3;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            width: calc(100% - 104px);
+            margin: -62px auto 22px;
+            padding: 28px 14px;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 18px 36px rgba(27, 24, 83, .12);
+        }
+
+        .stat {
+            display: grid;
+            justify-items: center;
+            gap: 8px;
+            min-height: 72px;
+            padding: 0 20px;
+            border-right: 1px solid var(--line);
+            text-align: center;
+        }
+
+        .stat:last-child {
+            border-right: 0;
+        }
+
+        .stat-value {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 31px;
+            font-weight: 900;
+        }
+
+        .stat-value.good {
+            color: var(--green);
+        }
+
+        .stat-value.medium {
+            color: var(--orange);
+        }
+
+        .stat-value.low {
+            color: #d93025;
+        }
+
+        .stat-label {
+            color: #43409a;
+        }
+
+        .main {
+            width: calc(100% - 104px);
+            margin: 0 auto;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+            align-items: center;
+            justify-content: flex-start;
+            gap: 22px;
+            margin-bottom: 28px;
+        }
+
+        .actions .primary-btn,
+        .actions .outline-btn {
+            min-width: 0;
+            min-height: 72px;
+            font-size: clamp(17px, 1.35vw, 21px);
+            padding: 0 clamp(20px, 2.8vw, 42px);
+        }
+
+        .actions .outline-btn {
+            justify-content: flex-start;
+            padding-right: 34px;
+        }
+
+        .action-copy {
+            display: grid;
+            gap: 4px;
+            text-align: left;
+            line-height: 1.05;
+        }
+
+        .action-subtitle {
+            color: #5a56a6;
+            font-size: clamp(12px, 1.05vw, 16px);
+            font-weight: 700;
+        }
+
+        .action-icon {
+            width: clamp(24px, 2.15vw, 32px);
+            height: clamp(24px, 2.15vw, 32px);
+            stroke-width: 2.7;
+        }
+
+        .outline-btn {
+            color: var(--brand);
+            background: #fff;
+            border: 1px solid var(--brand);
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-2px);
+            background: #2410d8;
+            box-shadow: 0 18px 34px rgba(47, 22, 244, .3);
+        }
+
+        .outline-btn:hover {
+            transform: translateY(-2px);
+            background: var(--brand-soft);
+            border-color: #2410d8;
+            box-shadow: 0 14px 28px rgba(47, 22, 244, .16);
+        }
+
+        .tab:hover {
+            color: var(--brand);
+            border-color: #c9bcff;
+            background: #faf8ff;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(310px, .95fr);
+            gap: 18px;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 14px 32px rgba(27, 24, 83, .08);
+        }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 18px 12px;
+        }
+
+        .panel-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .panel-title-icon {
+            width: 26px;
+            height: 26px;
+            color: var(--brand);
+            stroke-width: 2.4;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tab {
+            min-height: 34px;
+            padding: 7px 18px;
+            border: 1px solid #d9d6f5;
+            border-radius: 8px;
+            color: #29246e;
+            background: #fff;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .tab.active {
+            color: var(--brand);
+            background: var(--brand-soft);
+            border-color: #c9bcff;
+        }
+
+        .leaderboard-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 0 18px 12px;
+        }
+
+        .sort-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #4b4896;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .sort-select-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 34px;
+            padding: 0 10px;
+            border: 1px solid #d9d6f5;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .sort-icon {
+            width: 17px;
+            height: 17px;
+            color: #ffb21a;
+            stroke-width: 2.4;
+        }
+
+        .sort-select {
+            border: 0;
+            outline: 0;
+            color: #29246e;
+            background: transparent;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .leaderboard-table th,
+        .leaderboard-table td {
+            padding: 12px 18px;
+            border-top: 1px solid #f0eff8;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        .leaderboard-table th {
+            color: #3e3b83;
+            font-size: 13px;
+        }
+
+        .time-heading {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .info-tip {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #7476bd;
+            cursor: help;
+        }
+
+        .info-tip svg,
+        .info-tip-icon {
+            width: 15px;
+            height: 15px;
+            stroke-width: 2.3;
+        }
+
+        .info-tip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 8px);
+            z-index: 20;
+            width: max-content;
+            max-width: 210px;
+            padding: 7px 10px;
+            border-radius: 8px;
+            color: #fff;
+            background: #161443;
+            box-shadow: 0 10px 22px rgba(22, 20, 67, .18);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.25;
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, 4px);
+            transition: opacity .16s ease, transform .16s ease;
+        }
+
+        .info-tip:hover::after,
+        .info-tip:focus-visible::after {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        .user-row {
+            background: #faf8ff;
+            font-weight: 800;
+        }
+
+        .rank {
+            display: inline-grid;
+            place-items: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            color: #1f1b64;
+            background: #eef0ff;
+            font-weight: 900;
+        }
+
+        .rank.first {
+            color: #fff;
+            background: #ffc226;
+        }
+
+        .rank.second {
+            color: #fff;
+            background: #aeb3ca;
+        }
+
+        .rank.third {
+            color: #fff;
+            background: #e97722;
+        }
+
+        .you-badge {
+            display: inline-flex;
+            margin-left: 8px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            color: #fff;
+            background: var(--brand);
+            font-size: 12px;
+        }
+
+        .score-cell {
+            color: var(--brand);
+            font-weight: 900;
+        }
+
+        .accuracy-cell {
+            color: #0c941f;
+            font-weight: 900;
+        }
+
+        .accuracy-cell.low {
+            color: #d93025;
+        }
+
+        .accuracy-cell.medium {
+            color: var(--orange);
+        }
+
+        .empty {
+            padding: 28px 18px;
+            color: var(--muted);
+        }
+
+        .progress-list {
+            display: grid;
+            padding: 10px 18px 18px;
+        }
+
+        .progress-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 16px 0;
+            border-top: 1px solid #f0eff8;
+            color: #413f91;
+        }
+
+        .progress-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-icon {
+            width: 22px;
+            height: 22px;
+            color: var(--brand);
+            stroke-width: 2.4;
+        }
+
+        .progress-row strong {
+            color: var(--brand);
+        }
+
+        .motivation {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 140px;
+            gap: 12px;
+            align-items: center;
+            margin-top: 16px;
+            padding: 16px 18px 0;
+            overflow: hidden;
+            color: #241fa1;
+            background: linear-gradient(90deg, #f0eaff, #dfd2ff);
+        }
+
+        .motivation strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+
+        .inline-icon {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            margin-left: 4px;
+            vertical-align: -3px;
+            stroke-width: 2.4;
+        }
+
+        .motivation img {
+            align-self: end;
+            width: 138px;
+            filter: drop-shadow(0 18px 18px rgba(68, 27, 186, .25));
+        }
+
+        @media (max-width: 1740px) {
+            .hero-side-planet {
+                display: none;
+            }
+        }
+
+        @media (max-width: 1100px) {
+
+
+            .hero,
+            .main,
+            .stats {
+                width: 100%;
+            }
+
+            .hero {
+                padding-inline: 26px;
+                min-height: 530px;
+                padding-bottom: 128px;
+            }
+
+            .hero-visual {
+                right: -24px;
+                bottom: -36px;
+                width: min(620px, 58vw);
+                height: min(430px, 40vw);
+            }
+
+            .stats,
+            .main {
+                width: calc(100% - 36px);
+            }
+        }
+
+        @media (max-width: 1420px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .leaderboard-controls {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .tabs {
+                width: 100%;
+            }
+
+            .tab {
+                flex: 1;
+            }
+
+            .sort-control {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .sort-select-wrap {
+                min-width: 220px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .hero {
+                min-height: 500px;
+                padding-bottom: 120px;
+            }
+
+            .hero-visual {
+                right: -106px;
+                bottom: 18px;
+                width: 460px;
+                height: 330px;
+                opacity: .9;
+            }
+
+            .hero-side-planet {
+                right: auto;
+                left: 28px;
+                bottom: 138px;
+                width: 120px;
+                opacity: .28;
+            }
+
+            .hero-planet {
+                bottom: 0;
+                width: 130%;
+            }
+
+            .hero-trophy {
+                width: 46%;
+                bottom: 35%;
+            }
+
+            .hero-visual::after {
+                bottom: 36%;
+                width: 27%;
+            }
+
+            .score-card {
+                z-index: 7;
+                width: min(100%, 320px);
+            }
+
+            .stats,
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .leaderboard-controls {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .tabs,
+            .sort-control,
+            .sort-select-wrap {
+                width: 100%;
+            }
+
+            .tab {
+                flex: 1;
+            }
+
+            .sort-select {
+                flex: 1;
+            }
+
+            .actions .primary-btn,
+            .actions .outline-btn {
+                justify-content: center;
+                min-height: 62px;
+                padding: 0 12px;
+                font-size: 14px;
+                gap: 8px;
+            }
+
+            .action-copy {
+                text-align: center;
+            }
+
+            .action-subtitle {
+                font-size: 11px;
+            }
+
+            .action-icon {
+                width: 20px;
+                height: 20px;
+            }
+
+            .stats {
+                margin-top: -76px;
+                padding: 16px;
+            }
+
+            .stat {
+                border-right: 0;
+                border-bottom: 1px solid var(--line);
+                padding: 14px 0;
+            }
+
+            .stat:last-child {
+                border-bottom: 0;
+            }
+
+            .leaderboard-table th:nth-child(6),
+            .leaderboard-table td:nth-child(6) {
+                display: none;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="/css/sidebar.css">
+</head>
+<body>
+<div class="page">
+    <aside th:replace="~{fragments/sidebar :: sidebar('')}"></aside>
+
+    <main class="content">
+        <section class="hero">
+            <div class="eyebrow">Результаты квиза</div>
+            <h1 th:text="${quizName != null ? quizName : 'Квиз'}">Геометрия: фигуры и свойства</h1>
+            <div class="meta">
+                <span th:if="${resultMode == 'multiplayer'}">
+                    <i class="meta-icon" data-lucide="users-round" aria-hidden="true"></i>
+                    <span>Совместный режим</span>
+                </span>
+                <span th:unless="${resultMode == 'multiplayer'}">
+                    <i class="meta-icon" data-lucide="user-round" aria-hidden="true"></i>
+                    <span>Одиночный режим</span>
+                </span>
+                <span>•</span>
+                <span>
+                    <i class="meta-icon" data-lucide="help-circle" aria-hidden="true"></i>
+                    <span th:text="${quizQuestionCount != null ? quizQuestionCount + ' вопросов' : 'Вопросы'}">10 вопросов</span>
+                </span>
+                <span>•</span>
+                <span>
+                    <i class="meta-icon" data-lucide="clock" aria-hidden="true"></i>
+                    <span th:text="${quizTimePerQuestion != null ? quizTimePerQuestion + ' сек на вопрос' : 'Без ограничения'}">30 сек на вопрос</span>
+                </span>
+            </div>
+
+            <div class="score-card">
+                <div class="score-label">Ваш результат</div>
+                <div class="score-line">
+                    <div class="score-number" data-score-value th:text="${score != null ? score : 0}">12</div>
+                    <div class="score-word" data-score-word>очков</div>
+                </div>
+                <div class="stake-pill"
+                     th:if="${catStakeBonus != null and catStakeBonus != 0}"
+                     th:text="${catStakeBonus > 0 ? '+' + catStakeBonus + ' за ставку 🔥' : catStakeBonus + ' за ставку'}">+3 за ставку 🔥</div>
+            </div>
+            <img class="hero-side-planet" src="/images/planet.png" alt="" aria-hidden="true">
+            <div class="hero-visual" aria-hidden="true">
+                <img class="hero-trophy" src="/images/trophey.png" alt="">
+                <img class="hero-planet" src="/images/planet_under_trophy.png" alt="">
+            </div>
+        </section>
+
+        <section class="stats">
+            <div class="stat">
+                <div class="stat-value"
+                     th:with="accuracy=${totalQuestions != null and totalQuestions > 0 and correctAnswers != null ? (correctAnswers * 100 / totalQuestions) : 0}"
+                     th:classappend="${accuracy >= 80} ? 'good' : (${accuracy >= 60} ? 'medium' : 'low')"
+                     th:text="${totalQuestions != null and totalQuestions > 0 and correctAnswers != null ? (correctAnswers * 100 / totalQuestions) + '%' : '0%'}">80%</div>
+                <div class="stat-label">Точность</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">
+                    <span th:text="${correctAnswers != null ? correctAnswers : 0}">8</span>
+                    <span>/</span>
+                    <span th:text="${totalQuestions != null ? totalQuestions : 0}">10</span>
+                </div>
+                <div class="stat-label">Ответы</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">◷ <span th:text="${formattedTimeSpent != null ? formattedTimeSpent : '00:00'}">00:13</span></div>
+                <div class="stat-label">Время</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" th:text="${questionTypeLabel != null ? questionTypeLabel : 'Смешанные'}">Смешанные</div>
+                <div class="stat-label">Тип вопросов</div>
+            </div>
+        </section>
+
+        <section class="main">
+            <div class="actions">
+                <button class="primary-btn" onclick="startQuizAgain()">
+                    <i class="action-icon" data-lucide="rotate-ccw" aria-hidden="true"></i>
+                    <span>Сыграть ещё раз</span>
+                </button>
+                <button class="outline-btn" onclick="startMultiplayer()">
+                    <i class="action-icon" data-lucide="users" aria-hidden="true"></i>
+                    <span class="action-copy">
+                        <span>Играть с друзьями</span>
+                        <span class="action-subtitle">Пригласите друзей и соревнуйтесь!</span>
+                    </span>
+                </button>
+            </div>
+
+            <div class="grid">
+                <section class="panel">
+                    <div class="panel-head">
+                        <div class="panel-title">Топ игроков</div>
+                    </div>
+                    <div class="leaderboard-controls">
+                        <div class="tabs">
+                            <button class="tab" data-mode="multiplayer" th:if="${resultMode == 'multiplayer'}">Совместный режим</button>
+                            <button class="tab" data-mode="solo">Общий топ</button>
+                        </div>
+                        <label class="sort-control">
+                            <span>Сортировать по:</span>
+                            <span class="sort-select-wrap">
+                                <i class="sort-icon" data-lucide="crown" aria-hidden="true"></i>
+                                <select class="sort-select" id="leaderboardSort">
+                                    <option value="score">Очкам</option>
+                                    <option value="accuracy">Точности</option>
+                                    <option value="attempt">Лучшей попытке</option>
+                                    <option value="time">Времени</option>
+                                </select>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="leaderboard-pane" data-pane="multiplayer" th:if="${resultMode == 'multiplayer'}">
+                        <table class="leaderboard-table"
+                               th:if="${multiplayerLeaderboard != null and multiplayerLeaderboard.entries() != null and !multiplayerLeaderboard.entries().isEmpty()}">
+                            <thead>
+                            <tr>
+                                <th>Место</th>
+                                <th>Игрок</th>
+                                <th>Очки</th>
+                                <th>Точность</th>
+                                <th>Лучшая попытка</th>
+                                <th>
+                                    <span class="time-heading">
+                                        <span>Время</span>
+                                        <span class="info-tip" data-tooltip="Формат: часы:минуты:секунды" tabindex="0">
+                                            <i class="info-tip-icon" data-lucide="info" aria-hidden="true"></i>
+                                        </span>
+                                    </span>
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="entry : ${multiplayerLeaderboard.entries()}"
+                                th:attr="data-score=${entry.score() != null ? entry.score() : 0},data-accuracy=${entry.accuracyPercent() != null ? entry.accuracyPercent() : 0},data-attempt=${entry.attemptNumber() != null ? entry.attemptNumber() : 2147483647},data-time=${entry.timeSpent() != null ? entry.timeSpent() : 2147483647}"
+                                th:classappend="${multiplayerLeaderboard.userPosition() != null and entry.position() != null and entry.position().equals(multiplayerLeaderboard.userPosition())} ? 'user-row' : ''">
+                                <td><span class="rank"
+                                          th:classappend="${entry.position() != null and entry.position() == 1} ? 'first' : (${entry.position() != null and entry.position() == 2} ? 'second' : (${entry.position() != null and entry.position() == 3} ? 'third' : ''))"
+                                          th:text="${entry.position()}">1</span></td>
+                                <td>
+                                    <span th:text="${entry.username()}">лера</span>
+                                    <span class="you-badge"
+                                          th:if="${multiplayerLeaderboard.userPosition() != null and entry.position() != null and entry.position().equals(multiplayerLeaderboard.userPosition())}">Вы</span>
+                                </td>
+                                <td class="score-cell" th:text="${entry.score()}">12</td>
+                                <td class="accuracy-cell"
+                                    th:classappend="${entry.accuracyPercent() != null and entry.accuracyPercent() < 60} ? 'low' : (${entry.accuracyPercent() != null and entry.accuracyPercent() < 80} ? 'medium' : '')"
+                                    th:text="${entry.accuracyPercent() != null ? entry.accuracyPercent() + '%' : '-'}">80%</td>
+                                <td th:text="${entry.attemptNumber() != null ? entry.attemptNumber() + '-я' : '-'}">3-я</td>
+                                <td th:text="${entry.formattedTimeSpent()}">00:00:13</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <div class="empty"
+                             th:if="${multiplayerLeaderboard == null or multiplayerLeaderboard.entries() == null or multiplayerLeaderboard.entries().isEmpty()}">
+                            В совместном режиме ещё нет завершённых попыток.
+                        </div>
+                    </div>
+
+                    <div class="leaderboard-pane" data-pane="solo">
+                        <table class="leaderboard-table"
+                               th:if="${soloLeaderboard != null and soloLeaderboard.entries() != null and !soloLeaderboard.entries().isEmpty()}">
+                            <thead>
+                            <tr>
+                                <th>Место</th>
+                                <th>Игрок</th>
+                                <th>Очки</th>
+                                <th>Точность</th>
+                                <th>Лучшая попытка</th>
+                                <th>
+                                    <span class="time-heading">
+                                        <span>Время</span>
+                                        <span class="info-tip" data-tooltip="Формат: часы:минуты:секунды" tabindex="0">
+                                            <i class="info-tip-icon" data-lucide="info" aria-hidden="true"></i>
+                                        </span>
+                                    </span>
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="entry : ${soloLeaderboard.entries()}"
+                                th:attr="data-score=${entry.score() != null ? entry.score() : 0},data-accuracy=${entry.accuracyPercent() != null ? entry.accuracyPercent() : 0},data-attempt=${entry.attemptNumber() != null ? entry.attemptNumber() : 2147483647},data-time=${entry.timeSpent() != null ? entry.timeSpent() : 2147483647}"
+                                th:classappend="${soloLeaderboard.userPosition() != null and entry.position() != null and entry.position().equals(soloLeaderboard.userPosition())} ? 'user-row' : ''">
+                                <td><span class="rank"
+                                          th:classappend="${entry.position() != null and entry.position() == 1} ? 'first' : (${entry.position() != null and entry.position() == 2} ? 'second' : (${entry.position() != null and entry.position() == 3} ? 'third' : ''))"
+                                          th:text="${entry.position()}">1</span></td>
+                                <td>
+                                    <span th:text="${entry.username()}">лера</span>
+                                    <span class="you-badge"
+                                          th:if="${soloLeaderboard.userPosition() != null and entry.position() != null and entry.position().equals(soloLeaderboard.userPosition())}">Вы</span>
+                                </td>
+                                <td class="score-cell" th:text="${entry.score()}">12</td>
+                                <td class="accuracy-cell"
+                                    th:classappend="${entry.accuracyPercent() != null and entry.accuracyPercent() < 60} ? 'low' : (${entry.accuracyPercent() != null and entry.accuracyPercent() < 80} ? 'medium' : '')"
+                                    th:text="${entry.accuracyPercent() != null ? entry.accuracyPercent() + '%' : '-'}">80%</td>
+                                <td th:text="${entry.attemptNumber() != null ? entry.attemptNumber() + '-я' : '-'}">3-я</td>
+                                <td th:text="${entry.formattedTimeSpent()}">00:00:13</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <div class="empty"
+                             th:if="${soloLeaderboard == null or soloLeaderboard.entries() == null or soloLeaderboard.entries().isEmpty()}">
+                            В одиночном режиме ещё нет завершённых попыток.
+                        </div>
+                    </div>
+                </section>
+
+                <aside>
+                    <section class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title">
+                                <i class="panel-title-icon" data-lucide="trending-up" aria-hidden="true"></i>
+                                <span>Ваш прогресс</span>
+                            </div>
+                        </div>
+                        <div class="progress-list">
+                            <div class="progress-row">
+                                <span class="progress-label">
+                                    <i class="progress-icon" data-lucide="trophy" aria-hidden="true"></i>
+                                    <span>Лучший результат</span>
+                                </span>
+                                <strong data-score-text th:attr="data-score=${leaderboard != null and leaderboard.userScore() != null ? leaderboard.userScore() : (score != null ? score : 0)}"
+                                        th:text="${leaderboard != null and leaderboard.userScore() != null ? leaderboard.userScore() + ' очков' : (score != null ? score + ' очков' : '0 очков')}">12 очков</strong>
+                            </div>
+                            <div class="progress-row">
+                                <span class="progress-label">
+                                    <i class="progress-icon" data-lucide="target" aria-hidden="true"></i>
+                                    <span>Лучшая попытка</span>
+                                </span>
+                                <strong th:text="${bestAttemptNumber != null ? bestAttemptNumber + '-я попытка' : '-'}">3-я попытка</strong>
+                            </div>
+                            <div class="progress-row">
+                                <span class="progress-label">
+                                    <i class="progress-icon" data-lucide="hash" aria-hidden="true"></i>
+                                    <span>Всего попыток</span>
+                                </span>
+                                <strong th:text="${totalCompletedAttempts != null ? totalCompletedAttempts : 0}">8</strong>
+                            </div>
+                            <div class="progress-row" th:if="${catStake != null}">
+                                <span>Ставка</span>
+                                <strong th:text="${catStakeBonus != null ? catStake + ' → ' + (catStakeBonus > 0 ? '+' + catStakeBonus : catStakeBonus) : catStake}">3 → +3</strong>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="panel motivation">
+                        <div>
+                            <strong>Каждая попытка делает вас лучше!</strong>
+                            <p>Продолжайте - и вы подниметесь на вершину таблицы лидеров<i data-lucide="rocket" class="inline-icon"></i></p>
+                        </div>
+                        <img src="/images/trophey.png" alt="">
+                    </section>
+                </aside>
+            </div>
+        </section>
+    </main>
+</div>
+
+<input type="hidden" id="resultUserId" th:value="${userId}">
+<input type="hidden" id="resultQuizId" th:value="${quizId}">
+<input type="hidden" id="leaderboardMode" th:value="${leaderboardMode}">
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+
+    const scoreWordForms = {
+        one: 'очко',
+        few: 'очка',
+        many: 'очков'
+    };
+
+    function getScoreWord(value) {
+        const number = Math.abs(Number(value) || 0);
+        const lastTwo = number % 100;
+        if (lastTwo >= 11 && lastTwo <= 14) {
+            return scoreWordForms.many;
+        }
+        const lastDigit = number % 10;
+        if (lastDigit === 1) {
+            return scoreWordForms.one;
+        }
+        if (lastDigit >= 2 && lastDigit <= 4) {
+            return scoreWordForms.few;
+        }
+        return scoreWordForms.many;
+    }
+
+    (function initScoreWords() {
+        document.querySelectorAll('[data-score-value]').forEach(scoreEl => {
+            const wordEl = scoreEl.parentElement?.querySelector('[data-score-word]');
+            if (wordEl) {
+                wordEl.textContent = getScoreWord(scoreEl.textContent);
+            }
+        });
+
+        document.querySelectorAll('[data-score-text]').forEach(scoreText => {
+            const score = scoreText.dataset.score || 0;
+            scoreText.textContent = `${score} ${getScoreWord(score)}`;
+        });
+    })();
+
+    function getQuizId() {
+        return document.getElementById('resultQuizId')?.value || new URLSearchParams(window.location.search).get('quizId');
+    }
+
+    function startQuizAgain() {
+        const quizId = getQuizId();
+        const userId = document.getElementById('resultUserId')?.value || localStorage.getItem('userId');
+        if (!quizId || !userId || Number.isNaN(parseInt(userId, 10))) {
+            window.location.href = '/login';
+            return;
+        }
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/quiz/' + quizId + '/attempt/restart';
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    function startMultiplayer() {
+        const quizId = getQuizId();
+        window.location.href = quizId ? '/multiplayer/create?quizId=' + quizId : '/home';
+    }
+
+    (function initTabs() {
+        const initialMode = document.getElementById('leaderboardMode')?.value || 'multiplayer';
+        const tabs = Array.from(document.querySelectorAll('.tab'));
+        const panes = Array.from(document.querySelectorAll('.leaderboard-pane'));
+        const sortSelect = document.getElementById('leaderboardSort');
+        const canonicalSort = ['score', 'accuracy', 'attempt', 'time'];
+        const sortDirections = {
+            score: 'desc',
+            accuracy: 'desc',
+            attempt: 'asc',
+            time: 'asc'
+        };
+
+        function valueFor(row, key) {
+            const value = Number(row.dataset[key]);
+            return Number.isFinite(value) ? value : 0;
+        }
+
+        function priorities(primary) {
+            return [primary, ...canonicalSort.filter(key => key !== primary)];
+        }
+
+        function compareRows(a, b, keys) {
+            for (const key of keys) {
+                const direction = sortDirections[key];
+                const diff = valueFor(a, key) - valueFor(b, key);
+                if (diff !== 0) {
+                    return direction === 'desc' ? -diff : diff;
+                }
+            }
+            return 0;
+        }
+
+        function updateRanks(rows) {
+            rows.forEach((row, index) => {
+                const rank = row.querySelector('.rank');
+                if (!rank) return;
+                const position = index + 1;
+                rank.textContent = position;
+                rank.classList.remove('first', 'second', 'third');
+                if (position === 1) rank.classList.add('first');
+                if (position === 2) rank.classList.add('second');
+                if (position === 3) rank.classList.add('third');
+            });
+        }
+
+        function sortPane(pane) {
+            if (!pane) return;
+            const tbody = pane.querySelector('tbody');
+            if (!tbody) return;
+            const primary = sortSelect?.value || 'score';
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort((a, b) => compareRows(a, b, priorities(primary)));
+            rows.forEach(row => tbody.appendChild(row));
+            updateRanks(rows);
+        }
+
+        function sortAllPanes() {
+            panes.forEach(sortPane);
+        }
+
+        function activate(mode) {
+            tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.mode === mode));
+            panes.forEach(pane => pane.style.display = pane.dataset.pane === mode ? '' : 'none');
+            sortAllPanes();
+        }
+
+        tabs.forEach(tab => tab.addEventListener('click', () => activate(tab.dataset.mode)));
+        sortSelect?.addEventListener('change', sortAllPanes);
+        activate(initialMode === 'solo' ? 'solo' : 'multiplayer');
+    })();
+</script>
+</body>
+</html>

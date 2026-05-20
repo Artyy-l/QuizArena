@@ -3,7 +3,6 @@ package org.example.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,7 +23,7 @@ public class Question {
   private String text;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false)
+  @Column(nullable = false, length = 32)
   private QuestionType type;
 
   @Column(columnDefinition = "TEXT")
@@ -33,17 +32,8 @@ public class Question {
   @Lob
   private byte[] image;
 
-  @Column(name = "is_generated")
-  private Boolean isGenerated;
-
   @Column(name = "generation_set_id")
   private Long generationSetId;
-
-  @Column(name = "is_valid")
-  private Boolean isValid;
-
-  @Column(name = "is_duplicate")
-  private Boolean isDuplicate;
 
   @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<AnswerOption> answerOptions = new ArrayList<>();

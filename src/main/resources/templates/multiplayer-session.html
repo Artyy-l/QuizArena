@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Совместное прохождение</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            padding: 32px;
+            color: #fff;
+            background:
+                radial-gradient(circle at 88% 16%, rgba(143, 69, 255, .26), transparent 18%),
+                radial-gradient(circle at 8% 72%, rgba(119, 62, 255, .22), transparent 24%),
+                linear-gradient(180deg, rgba(4, 3, 18, .2), rgba(4, 3, 18, .42)),
+                url('/images/space_for_game.png') center / cover fixed no-repeat;
+            font-family: Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            z-index: -1;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        body::before {
+            left: -120px;
+            bottom: -160px;
+            width: 420px;
+            height: 420px;
+            background: radial-gradient(circle at 40% 35%, rgba(144, 92, 255, .62), rgba(60, 24, 121, .44) 42%, transparent 68%);
+            filter: blur(.2px);
+        }
+
+        body::after {
+            right: 72px;
+            top: 112px;
+            width: 170px;
+            height: 170px;
+            background: radial-gradient(circle at 42% 35%, rgba(182, 113, 255, .52), rgba(74, 31, 141, .38) 48%, transparent 70%);
+        }
+
+        button,
+        a {
+            font: inherit;
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 18px;
+            left: 36px;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 46px;
+            padding: 0 20px;
+            border: 1px solid rgba(179, 117, 255, .68);
+            border-radius: 12px;
+            color: #fff;
+            background: rgba(12, 8, 38, .45);
+            text-decoration: none;
+            font-weight: 800;
+            box-shadow: 0 12px 30px rgba(34, 18, 79, .22);
+            backdrop-filter: blur(10px);
+        }
+
+        .back-btn:hover {
+            border-color: #d98cff;
+            background: rgba(105, 54, 200, .3);
+        }
+
+        .back-btn svg {
+            width: 22px;
+            height: 22px;
+            color: #cfa9ff;
+            stroke-width: 2.6;
+        }
+
+        .session-shell {
+            display: grid;
+            place-items: center;
+            min-height: calc(100vh - 64px);
+        }
+
+        .session-card {
+            width: min(100%, 880px);
+            padding: 30px 42px 24px;
+            border: 1px solid rgba(179, 117, 255, .72);
+            border-radius: 24px;
+            color: #fff;
+            background:
+                radial-gradient(circle at 96% 100%, rgba(188, 55, 255, .26), transparent 32%),
+                linear-gradient(180deg, rgba(13, 12, 50, .76), rgba(9, 8, 34, .86));
+            box-shadow: 0 0 34px rgba(160, 82, 255, .28), inset 0 0 70px rgba(126, 86, 232, .14);
+            text-align: center;
+            backdrop-filter: blur(14px);
+        }
+
+        .mode-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 42px;
+            padding: 0 20px;
+            border: 1px solid rgba(179, 117, 255, .52);
+            border-radius: 999px;
+            color: #cdb7ff;
+            background: rgba(89, 55, 160, .28);
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .mode-pill svg {
+            width: 21px;
+            height: 21px;
+        }
+
+        .quiz-title {
+            max-width: 100%;
+            margin: 24px 0 22px;
+            overflow-wrap: anywhere;
+            color: #fff;
+            font-size: clamp(42px, 5vw, 68px);
+            font-weight: 900;
+            line-height: 1.04;
+            text-transform: lowercase;
+            text-shadow: 0 8px 30px rgba(0, 0, 0, .42);
+        }
+
+        .session-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            min-height: 50px;
+            padding: 0 22px;
+            border: 1px solid rgba(179, 117, 255, .72);
+            border-radius: 12px;
+            color: #fff;
+            background: rgba(15, 13, 54, .62);
+            cursor: pointer;
+            font-weight: 800;
+            box-shadow: inset 0 0 24px rgba(156, 109, 255, .08);
+        }
+
+        .session-link:hover {
+            border-color: #d98cff;
+            box-shadow: 0 0 18px rgba(201, 86, 255, .22);
+        }
+
+        .session-link svg {
+            width: 22px;
+            height: 22px;
+            color: #b477ff;
+        }
+
+        .copy-feedback {
+            height: 22px;
+            margin-top: 8px;
+            color: #87f1dd;
+            font-size: 14px;
+            font-weight: 800;
+            opacity: 0;
+            transition: opacity .16s ease;
+        }
+
+        .copy-feedback.show {
+            opacity: 1;
+        }
+
+        .participants-box {
+            margin: 18px auto 22px;
+            padding: 26px 30px 18px;
+            border: 1px solid rgba(155, 119, 230, .38);
+            border-radius: 18px;
+            background: rgba(11, 10, 43, .44);
+            box-shadow: inset 0 0 34px rgba(126, 93, 234, .08);
+        }
+
+        .participants-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .participants-header span:last-child {
+            color: #d8ccff;
+        }
+
+        .participants-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(70px, 1fr));
+            gap: 28px 34px;
+        }
+
+        .participant {
+            display: grid;
+            justify-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .participant-avatar {
+            position: relative;
+            display: grid;
+            place-items: center;
+            width: 82px;
+            height: 82px;
+            border: 2px solid rgba(139, 109, 255, .9);
+            border-radius: 50%;
+            color: #fff;
+            background: linear-gradient(135deg, #5e83ff, #8d25e9);
+            box-shadow: 0 0 22px rgba(110, 118, 255, .58);
+            font-size: 36px;
+            font-weight: 900;
+        }
+
+        .host-badge {
+            position: absolute;
+            right: -5px;
+            top: -8px;
+            display: grid;
+            place-items: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            color: #3153e8;
+            background: #eaf7ff;
+            box-shadow: 0 0 14px rgba(205, 238, 255, .62);
+        }
+
+        .host-badge svg {
+            width: 17px;
+            height: 17px;
+            stroke-width: 2.8;
+        }
+
+        .participant-name {
+            width: 100%;
+            overflow: hidden;
+            color: #a9ddff;
+            font-size: 14px;
+            font-weight: 800;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .empty-seat .participant-avatar {
+            border: 1px dashed rgba(155, 119, 230, .58);
+            color: #bda4ff;
+            background: rgba(21, 20, 67, .42);
+            box-shadow: inset 0 0 22px rgba(126, 93, 234, .08);
+            font-size: 34px;
+            font-weight: 500;
+        }
+
+        .participants-note {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            margin-top: 16px;
+            color: #b8acd8;
+            font-size: 16px;
+        }
+
+        .participants-note svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .primary-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            width: 100%;
+            min-height: 72px;
+            border: 1px solid rgba(255, 158, 245, .52);
+            border-radius: 16px;
+            color: #fff;
+            background: linear-gradient(90deg, #4e7cff, #b934f2);
+            cursor: pointer;
+            font-size: 28px;
+            font-weight: 900;
+            box-shadow: 0 16px 40px rgba(116, 76, 255, .34), inset 0 0 18px rgba(255, 255, 255, .12);
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 20px 48px rgba(116, 76, 255, .42), inset 0 0 18px rgba(255, 255, 255, .12);
+        }
+
+        .primary-btn svg {
+            width: 30px;
+            height: 30px;
+            fill: currentColor;
+        }
+
+        .cancel-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 16px 0 18px;
+            border: 0;
+            color: #bda4ff;
+            background: transparent;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .cancel-link:hover {
+            color: #fff;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            min-height: 56px;
+            padding: 0 18px;
+            border: 1px solid rgba(155, 119, 230, .36);
+            border-radius: 14px;
+            color: #d8ccff;
+            background: rgba(11, 10, 43, .36);
+            font-size: 18px;
+        }
+
+        .status strong {
+            color: #fff;
+        }
+
+        .status svg {
+            width: 24px;
+            height: 24px;
+            color: #b477ff;
+        }
+
+        .error-message {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border: 1px solid rgba(255, 108, 174, .42);
+            border-radius: 10px;
+            color: #ffd7e7;
+            background: rgba(117, 22, 66, .52);
+            font-weight: 800;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                padding: 18px 14px 28px;
+            }
+
+            .back-btn {
+                position: static;
+                width: max-content;
+                margin-bottom: 22px;
+            }
+
+            .session-shell {
+                min-height: auto;
+            }
+
+            .session-card {
+                padding: 24px 16px 18px;
+                border-radius: 18px;
+            }
+
+            .quiz-title {
+                font-size: 38px;
+            }
+
+            .participants-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 20px 14px;
+            }
+
+            .participant-avatar {
+                width: 70px;
+                height: 70px;
+                font-size: 30px;
+            }
+
+            .primary-btn {
+                min-height: 64px;
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+<a class="back-btn" th:href="${quizId != null ? '/quiz/' + quizId : '/home'}">
+    <i data-lucide="arrow-left" aria-hidden="true"></i>
+    <span>Назад</span>
+</a>
+
+<main class="session-shell">
+    <section class="session-card" aria-labelledby="quizName">
+        <div class="mode-pill">
+            <i data-lucide="users" aria-hidden="true"></i>
+            <span>Совместное прохождение</span>
+        </div>
+
+        <h1 class="quiz-title" id="quizName" th:text="${quizName != null ? quizName : 'Название квиза'}" th:attr="data-quiz-id=${quizId}">Название квиза</h1>
+
+        <button class="session-link" id="sessionLink" type="button" onclick="copySessionLink(event)">
+            <i data-lucide="link" aria-hidden="true"></i>
+            <span>Скопировать ссылку на сессию</span>
+            <i data-lucide="copy" aria-hidden="true"></i>
+        </button>
+        <div class="copy-feedback" id="copyFeedback">Ссылка скопирована</div>
+
+        <div class="participants-box">
+            <div class="participants-header">
+                <span>Участники</span>
+                <span id="participantCount">0/10</span>
+            </div>
+            <div class="participants-grid" id="participantsGrid"></div>
+            <div class="participants-note">
+                <i data-lucide="users-round" aria-hidden="true"></i>
+                <span>Можно пригласить до 10 участников</span>
+            </div>
+        </div>
+
+        <button class="primary-btn" id="startSessionBtn" onclick="startSession()" th:if="${currentUserId != null and hostUserId != null and currentUserId == hostUserId}">
+            <i data-lucide="play" aria-hidden="true"></i>
+            <span>Начать</span>
+        </button>
+
+        <button class="cancel-link" type="button" onclick="cancelSession()">
+            <span>Отменить</span>
+        </button>
+
+        <div class="status" id="sessionStatus">
+            <i data-lucide="clock" aria-hidden="true"></i>
+            <span th:text="${(currentUserId != null and hostUserId != null and currentUserId == hostUserId) ? 'Статус: ожидание участников' : 'Ожидание начала квиза'}">Статус: ожидание участников</span>
+        </div>
+        <div th:if="${errorMessage != null}" class="error-message" th:text="${errorMessage}"></div>
+    </section>
+</main>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script th:inline="javascript">
+    let SESSION_ID = /*[[${sessionId}]]*/ null;
+    let HOST_USER_ID = Number(/*[[${hostUserId}]]*/ 0) || Number(localStorage.getItem('userId')) || 1;
+    const CURRENT_USER_ID = Number(/*[[${currentUserId}]]*/ 0) || Number(localStorage.getItem('userId')) || 0;
+    const QUIZ_ID = /*[[${quizId}]]*/ null;
+    const MAX_PARTICIPANTS = 10;
+    const API_BASE = '/api/multiplayer';
+
+    function refreshIcons() {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function getSessionIdFromUrl() {
+        const pathMatch = window.location.pathname.match(/\/multiplayer\/session\/([^\/\?]+)/);
+        return pathMatch && pathMatch[1] ? pathMatch[1] : null;
+    }
+
+    if (!SESSION_ID || SESSION_ID === 'null') {
+        SESSION_ID = getSessionIdFromUrl();
+    }
+
+    function getInitials(username) {
+        return (username || 'U')
+            .trim()
+            .split(/\s+/)
+            .map(word => word[0] || '')
+            .join('')
+            .slice(0, 2)
+            .toUpperCase() || 'U';
+    }
+
+    function renderParticipants(participants) {
+        const grid = document.getElementById('participantsGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        for (let i = 0; i < MAX_PARTICIPANTS; i++) {
+            const participant = participants[i];
+            const slot = document.createElement('div');
+            const avatar = document.createElement('div');
+            const name = document.createElement('div');
+
+            avatar.className = 'participant-avatar';
+            name.className = 'participant-name';
+
+            if (participant) {
+                const username = participant.username || 'Участник';
+                const isHost = participant.userId === HOST_USER_ID;
+                slot.className = 'participant' + (isHost ? ' host' : '');
+                avatar.textContent = getInitials(username);
+                if (isHost) {
+                    const hostBadge = document.createElement('span');
+                    hostBadge.className = 'host-badge';
+                    hostBadge.innerHTML = '<i data-lucide="key-round" aria-hidden="true"></i>';
+                    avatar.appendChild(hostBadge);
+                }
+                name.textContent = participant.userId === CURRENT_USER_ID
+                    ? (participant.userId === HOST_USER_ID ? 'Вы - хост' : 'Вы')
+                    : username;
+                slot.title = username;
+            } else {
+                slot.className = 'participant empty-seat';
+                avatar.textContent = '+';
+                name.textContent = '';
+                slot.title = 'Свободное место';
+            }
+
+            slot.appendChild(avatar);
+            slot.appendChild(name);
+            grid.appendChild(slot);
+        }
+
+        document.getElementById('participantCount').textContent = `${participants.length}/${MAX_PARTICIPANTS}`;
+        refreshIcons();
+    }
+
+    function setStatus(text, status) {
+        const el = document.getElementById('sessionStatus');
+        if (!el) return;
+        const icon = status === 'STARTED' ? 'rocket' : status === 'ERROR' ? 'circle-alert' : 'clock';
+        el.innerHTML = `<i data-lucide="${icon}" aria-hidden="true"></i><span>${text}</span>`;
+        refreshIcons();
+    }
+
+    function translateStatus(status) {
+        switch (status) {
+            case 'WAITING': return 'ожидание участников';
+            case 'STARTED': return 'идет прохождение';
+            case 'FINISHED': return 'завершена';
+            case 'CANCELLED': return 'отменена';
+            default: return status || 'неизвестно';
+        }
+    }
+
+    async function fetchSession() {
+        if (!SESSION_ID) {
+            setStatus('Ошибка: ID сессии не найден', 'ERROR');
+            return null;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/sessions/${SESSION_ID}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Сервер вернул ${response.status}`);
+            }
+
+            const session = await response.json();
+            document.getElementById('quizName').textContent = session.quizName || 'Название квиза';
+            renderParticipants(session.participants || []);
+
+            const isHost = CURRENT_USER_ID && HOST_USER_ID && CURRENT_USER_ID === HOST_USER_ID;
+            if (isHost) {
+                setStatus(`Статус: ${translateStatus(session.status)}`, session.status);
+            } else if (session.status === 'STARTED') {
+                setStatus('Квиз начался', session.status);
+            } else {
+                setStatus('Ожидание начала квиза', session.status);
+            }
+
+            return session;
+        } catch (error) {
+            setStatus(`Не удалось загрузить данные сессии: ${error.message}`, 'ERROR');
+            return null;
+        }
+    }
+
+    async function startSession() {
+        try {
+            const response = await fetch(`${API_BASE}/sessions/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                },
+                body: JSON.stringify({
+                    sessionId: SESSION_ID,
+                    hostUserId: HOST_USER_ID
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.message || 'Нельзя начать совместное прохождение одному. Нужно минимум 2 участника.');
+            }
+
+            setStatus('Сессия запущена', 'STARTED');
+        } catch (error) {
+            setStatus(error.message, 'ERROR');
+        }
+    }
+
+    async function cancelSession() {
+        const isHost = CURRENT_USER_ID && HOST_USER_ID && CURRENT_USER_ID === HOST_USER_ID;
+
+        try {
+            if (isHost) {
+                const response = await fetch(`${API_BASE}/sessions/cancel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    },
+                    body: JSON.stringify({
+                        sessionId: SESSION_ID,
+                        hostUserId: HOST_USER_ID
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.message || `Сервер вернул ${response.status}`);
+                }
+            } else {
+                const response = await fetch(`${API_BASE}/sessions/${SESSION_ID}/leave?userId=${CURRENT_USER_ID}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.message || `Сервер вернул ${response.status}`);
+                }
+            }
+
+            window.location.href = QUIZ_ID ? `/quiz/${QUIZ_ID}` : '/home';
+        } catch (error) {
+            setStatus(error.message, 'ERROR');
+        }
+    }
+
+    function copySessionLink(event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        const currentSessionId = SESSION_ID || getSessionIdFromUrl();
+        if (!currentSessionId) {
+            setStatus('Ошибка: ID сессии не найден', 'ERROR');
+            return;
+        }
+
+        const linkText = `${window.location.origin}/multiplayer/join?sessionId=${currentSessionId}`;
+        const feedback = document.getElementById('copyFeedback');
+
+        const showFeedback = () => {
+            if (!feedback) return;
+            feedback.classList.add('show');
+            setTimeout(() => feedback.classList.remove('show'), 2000);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(linkText).then(showFeedback).catch(() => {
+                fallbackCopyTextToClipboard(linkText);
+                showFeedback();
+            });
+        } else {
+            fallbackCopyTextToClipboard(linkText);
+            showFeedback();
+        }
+    }
+
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+        } finally {
+            document.body.removeChild(textArea);
+        }
+    }
+
+    refreshIcons();
+    fetchSession();
+
+    const pollInterval = setInterval(async () => {
+        const session = await fetchSession();
+        if (!session) return;
+
+        if (session.status === 'STARTED') {
+            clearInterval(pollInterval);
+            const quizId = QUIZ_ID || document.querySelector('[data-quiz-id]')?.getAttribute('data-quiz-id');
+            window.location.href = quizId ? `/quiz/${quizId}/attempt?sessionId=${SESSION_ID}` : '/home';
+        }
+    }, 2000);
+
+    window.addEventListener('beforeunload', () => {
+        clearInterval(pollInterval);
+    });
+</script>
+</body>
+</html>

@@ -2,13 +2,8 @@ package org.example.model;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
-
 import java.time.Duration;
 
-/**
- * Конвертер для преобразования Duration в секунды (Integer) при сохранении в БД
- * и обратно при чтении из БД.
- */
 @Converter(autoApply = false)
 public class DurationSecondsConverter implements AttributeConverter<Duration, Integer> {
 
@@ -28,4 +23,3 @@ public class DurationSecondsConverter implements AttributeConverter<Duration, In
         return Duration.ofSeconds(seconds);
     }
 }
-

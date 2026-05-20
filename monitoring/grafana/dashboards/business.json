@@ -1,0 +1,173 @@
+{
+  "title": "Business",
+  "uid": "quizarena-business",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Games Right Now",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "value": 0, "color": "green" }] } }
+      },
+      "targets": [
+        {
+          "expr": "quizarena_active_attempts",
+          "legendFormat": "active games"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Total Correct Answers (all time)",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "value": 0, "color": "green" }] } }
+      },
+      "targets": [
+        {
+          "expr": "quizarena_answers_total{result=\"correct\"}",
+          "legendFormat": "correct"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Total Incorrect Answers (all time)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "value": 0, "color": "red" }] } }
+      },
+      "targets": [
+        {
+          "expr": "quizarena_answers_total{result=\"incorrect\"}",
+          "legendFormat": "incorrect"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Answers per Minute (rate)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(quizarena_answers_total{result=\"correct\"}[1m]) * 60",
+          "legendFormat": "correct / min"
+        },
+        {
+          "expr": "rate(quizarena_answers_total{result=\"incorrect\"}[1m]) * 60",
+          "legendFormat": "incorrect / min"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Game Duration (seconds)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(quizarena_attempt_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(quizarena_attempt_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Question Generation Duration (seconds)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(quizarena_generation_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "generation p50"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(quizarena_fastapi_seconds_bucket{endpoint=\"generate\"}[5m])) by (le))",
+          "legendFormat": "ml api p50"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(quizarena_fastapi_seconds_bucket{endpoint=\"ethics\"}[5m])) by (le))",
+          "legendFormat": "ethics check p50"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Generation Results",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(quizarena_generation_total{status=\"success\"}[5m]) * 60",
+          "legendFormat": "success / min"
+        },
+        {
+          "expr": "rate(quizarena_generation_total{status=\"failed\"}[5m]) * 60",
+          "legendFormat": "failed / min"
+        },
+        {
+          "expr": "rate(quizarena_generation_total{status=\"unethical\"}[5m]) * 60",
+          "legendFormat": "unethical / min"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Questions Generated per Request",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(quizarena_questions_generated_sum[5m]) / rate(quizarena_questions_generated_count[5m])",
+          "legendFormat": "avg questions / request"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Validation Failures per Minute",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(quizarena_validation_failed_total[1m]) * 60",
+          "legendFormat": "validation failures / min"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Kafka DLT Messages",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(quizarena_kafka_dlt_total[5m]) * 60",
+          "legendFormat": "dlt messages / min"
+        }
+      ]
+    }
+  ]
+}

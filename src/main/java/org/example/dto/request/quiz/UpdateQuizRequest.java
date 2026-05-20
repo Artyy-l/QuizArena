@@ -1,5 +1,7 @@
 package org.example.dto.request.quiz;
 
+import org.example.model.QuestionType;
+
 public record UpdateQuizRequest(
         Long quizId,
         Long userId,
@@ -8,5 +10,6 @@ public record UpdateQuizRequest(
         Integer questionNumber,
         Integer timeLimit,
         Boolean isPrivate,
-        Boolean isStatic
+        Boolean isStatic,
+        QuestionType defaultQuestionType
 ) {}

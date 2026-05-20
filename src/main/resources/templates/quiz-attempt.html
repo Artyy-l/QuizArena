@@ -1,0 +1,2997 @@
+﻿<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Прохождение квиза</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            display: block;
+        }
+        body.page-initializing .sidebar,
+        body.page-initializing .main-content {
+            visibility: hidden;
+        }
+
+        .sidebar {
+            width: 240px;
+            background: white;
+            padding: 20px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+            position: fixed;
+            left: 24px;
+            top: 24px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+            box-sizing: border-box;
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 14px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 17px;
+            width: 100%;
+            transition: all 0.3s;
+            text-align: center;
+            text-decoration: none;
+            display: block;
+            box-sizing: border-box;
+        }
+
+        .nav-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .main-content {
+            padding: 24px;
+            margin-left: 288px;
+            margin-right: 0;
+            max-width: calc(100% - 280px);
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            text-align: center;
+            margin: 0 0 10px 0;
+        }
+
+        .quiz-info {
+            text-align: center;
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .progress-info {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            align-items: stretch;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+        }
+
+        .progress-item {
+            flex: 1 1 30%;
+            min-width: 160px;
+            text-align: center;
+        }
+
+        .progress-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .progress-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .cat-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+            box-sizing: border-box;
+        }
+        .cat-overlay-hidden {
+            display: none !important;
+        }
+        .cat-overlay-backdrop {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .cat-overlay-card {
+            position: relative;
+            z-index: 1;
+            width: min(96vw, 820px);
+            max-height: none;
+            overflow: visible;
+            box-sizing: border-box;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 28px 36px 32px;
+            box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+            color: #111;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .cat-overlay-card h2 {
+            margin: 0 0 12px;
+            font-size: 1.35rem;
+            color: #000;
+        }
+        .cat-overlay-hint {
+            margin: 0 0 20px;
+            color: #111;
+            font-size: 1rem;
+            line-height: 1.45;
+        }
+        .cat-leaderboard h3 {
+            margin: 0 0 12px;
+            font-size: 1rem;
+            color: #000;
+        }
+        .cat-leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 0 28px;
+            font-size: 0.95rem;
+            color: #111;
+        }
+        .cat-leaderboard-table th,
+        .cat-leaderboard-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .cat-leaderboard-table th {
+            color: #000;
+            font-weight: 600;
+            background: #f1f5f9;
+        }
+        .cat-leaderboard-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .cat-leaderboard-placeholder td {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        .cat-bet {
+            margin-top: 4px;
+        }
+        .cat-bet label {
+            display: block;
+            margin-bottom: 12px;
+            font-weight: 600;
+            color: #000;
+            font-size: 1rem;
+        }
+        .cat-bet-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px 20px;
+            align-items: center;
+        }
+        #catBetInput {
+            flex: 1;
+            min-width: 260px;
+            min-height: 48px;
+            padding: 14px 18px;
+            border: 2px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 1.05rem;
+            background: #fff;
+            color: #111;
+        }
+        .cat-btn {
+            padding: 14px 24px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .cat-btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            font-weight: 600;
+            border-radius: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        .cat-btn-primary:hover {
+            transform: translateY(-1px);
+        }
+        .cat-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .cat-error {
+            color: #b91c1c;
+            font-size: 0.95rem;
+            margin-top: 8px;
+        }
+        .cat-muted {
+            color: #111;
+            font-size: 0.95rem;
+        }
+        .cat-stake-timer {
+            position: absolute;
+            top: 20px;
+            right: 28px;
+            margin: 0;
+            color: #111;
+            font-size: 1.6rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: 0.2px;
+            z-index: 2;
+        }
+        #questionContentWrapper.cat-question-hidden {
+            visibility: hidden;
+            position: absolute;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+
+        .question-section {
+            margin-bottom: 30px;
+        }
+
+        .question-field {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .question-text {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+            line-height: 1.4;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: normal;
+            hyphens: auto;
+        }
+
+        .options-list {
+            list-style: none;
+            width: 100%;
+        }
+
+        .option-item {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .option-item label {
+            flex: 1;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            cursor: pointer;
+        }
+
+        .option-item input[type="radio"]:disabled,
+        .option-item input[type="checkbox"]:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .option-item input[type="radio"]:disabled + label,
+        .option-item input[type="checkbox"]:disabled + label {
+            cursor: not-allowed;
+            opacity: 0.6;
+            color: #999;
+        }
+
+        .option-item.correct-answer {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+
+        .option-item.correct-answer label {
+            color: #155724;
+            font-weight: bold;
+        }
+
+        .option-item.selected-wrong {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+
+        .option-item.selected-wrong label {
+            color: #721c24;
+        }
+
+        .explanation-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e7f3ff;
+            border: 2px solid #0066cc;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .explanation-section.show {
+            display: block;
+        }
+
+        .explanation-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #0066cc;
+            margin-bottom: 10px;
+        }
+
+        .explanation-text {
+            font-size: 16px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .option-item input[type="radio"],
+        .option-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            accent-color: #667eea;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            margin-top: 30px;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            padding: 8px 15px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            display: none;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        button {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .game-progress {
+            display: none;
+        }
+
+        .question-icon {
+            display: none;
+        }
+
+        .tip {
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                position: relative;
+                width: calc(100% - 48px);
+                left: 24px;
+                top: 24px;
+                margin-bottom: 0;
+                flex-direction: row;
+                gap: 12px;
+            }
+
+            .nav-btn {
+                flex: 1;
+                font-size: 15px;
+                padding: 12px 16px;
+            }
+
+            .main-content {
+                margin-left: 0;
+                max-width: 100%;
+                padding: 16px;
+            }
+
+            .progress-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .progress-item {
+                flex: 1 1 100%;
+            }
+        }
+
+        :root {
+            --game-ink: #ffffff;
+            --game-muted: rgba(255, 255, 255, .72);
+            --game-line: rgba(184, 145, 255, .34);
+            --game-card: rgba(11, 11, 42, .76);
+            --game-card-soft: rgba(34, 27, 92, .58);
+            --game-purple: #9c6dff;
+            --game-purple-strong: #5f33ff;
+            --game-green: #87f1dd;
+            --game-red: #ff6cae;
+        }
+
+        body {
+            min-height: 100vh;
+            color: var(--game-ink);
+            background:
+                radial-gradient(circle at 63% 76%, rgba(146, 64, 255, .38), rgba(146, 64, 255, 0) 24%),
+                linear-gradient(180deg, rgba(5, 4, 19, .32), rgba(5, 4, 19, .5)),
+                url('/images/space_for_game.png') center / cover fixed no-repeat;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: radial-gradient(circle at 28% 38%, rgba(132, 70, 255, .22), transparent 18%);
+            pointer-events: none;
+        }
+
+        .sidebar {
+            z-index: 10;
+            width: auto;
+            padding: 0;
+            background: transparent;
+            box-shadow: none;
+            left: 28px;
+            top: 24px;
+            border-radius: 0;
+        }
+
+        .sidebar .nav-btn:first-child {
+            display: none;
+        }
+
+        .nav-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: auto;
+            min-height: 54px;
+            padding: 0 24px;
+            border: 1px solid rgba(220, 124, 255, .92);
+            border-radius: 12px;
+            color: #fff;
+            background: rgba(12, 8, 38, .42);
+            box-shadow: 0 10px 26px rgba(80, 29, 160, .16);
+            font-size: 17px;
+            font-weight: 800;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-btn svg {
+            width: 22px;
+            height: 22px;
+            color: #cfa9ff;
+            stroke-width: 2.6;
+        }
+
+        .nav-btn:hover {
+            color: #fff;
+            background: rgba(105, 54, 200, .28);
+            border-color: #d98cff;
+        }
+
+        .main-content {
+            width: 100%;
+            max-width: none;
+            min-height: 100vh;
+            margin: 0;
+            padding: 24px 28px 32px;
+        }
+
+        .container {
+            display: grid;
+            justify-items: center;
+            width: min(100%, 1120px);
+            max-width: none;
+            margin: 0 auto;
+        }
+
+        .header {
+            width: min(100%, 780px);
+            margin: 0 auto;
+            padding: 0;
+            color: #fff;
+            background: transparent;
+            border-radius: 0;
+            box-shadow: none;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #fff;
+            font-size: clamp(34px, 3vw, 48px);
+            line-height: 1.05;
+            text-transform: lowercase;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, .42);
+        }
+
+        .quiz-info {
+            margin-top: 12px;
+            color: var(--game-muted);
+            font-size: 20px;
+        }
+
+        .content-section {
+            width: min(100%, 960px);
+            margin: 18px auto 0;
+            padding: 0;
+            background: transparent;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .progress-info {
+            position: fixed;
+            top: 24px;
+            right: 28px;
+            z-index: 10;
+            display: block;
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+        }
+
+        .progress-item {
+            display: none;
+        }
+
+        .progress-item:nth-child(2) {
+            display: block;
+            min-width: 124px;
+        }
+
+        .progress-item:nth-child(2) .progress-label {
+            display: none;
+        }
+
+        .progress-item:nth-child(2) .progress-value {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 54px;
+            padding: 0 18px;
+            border: 1px solid rgba(156, 109, 255, .75);
+            border-radius: 12px;
+            color: #fff;
+            background: rgba(12, 8, 38, .54);
+            box-shadow: 0 10px 26px rgba(80, 29, 160, .16);
+            font-size: 19px;
+            font-weight: 900;
+            backdrop-filter: blur(10px);
+        }
+
+        .time-icon {
+            width: 22px;
+            height: 22px;
+            color: #b995ff;
+            stroke-width: 2.6;
+        }
+
+        #multiplayerStatus {
+            position: fixed;
+            right: 28px;
+            top: 90px;
+            min-width: 180px;
+            padding: 10px 12px;
+            border: 1px solid rgba(156, 109, 255, .42);
+            border-radius: 10px;
+            color: #fff;
+            background: rgba(12, 8, 38, .62);
+            backdrop-filter: blur(10px);
+        }
+
+        body.cat-stake-active #multiplayerStatus {
+            display: none !important;
+        }
+
+        .game-progress {
+            display: block;
+            width: min(100%, 840px);
+            height: 12px;
+            margin: 22px auto 0;
+            padding: 2px;
+            border-radius: 999px;
+            background: rgba(63, 42, 151, .72);
+            box-shadow: inset 0 0 0 1px rgba(159, 116, 255, .18);
+        }
+
+        .game-progress-fill {
+            display: block;
+            width: var(--progress, 10%);
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #765dff, #c89cff);
+            box-shadow: 0 0 18px rgba(178, 120, 255, .8);
+        }
+
+        #questionContentWrapper {
+            width: 100%;
+        }
+
+        #answerForm {
+            width: min(100%, 950px);
+            margin: 20px auto 0;
+        }
+
+        .question-section {
+            position: relative;
+            width: 100%;
+            margin: 0;
+            padding: 28px 44px 36px;
+            border: 1px solid rgba(230, 220, 255, .35);
+            border-radius: 24px;
+            background:
+                radial-gradient(circle at 78% 96%, rgba(156, 76, 255, .46), transparent 32%),
+                linear-gradient(180deg, rgba(19, 18, 62, .74), rgba(10, 10, 36, .78));
+            box-shadow: 0 28px 72px rgba(0, 0, 0, .36), inset 0 0 55px rgba(97, 70, 190, .14);
+            backdrop-filter: blur(13px);
+        }
+
+        .question-icon {
+            display: grid;
+            place-items: center;
+            width: 58px;
+            height: 58px;
+            margin: 0 auto 18px;
+            border: 2px solid #9d74ff;
+            border-radius: 50%;
+            color: #d9c4ff;
+            background: rgba(91, 54, 183, .26);
+            box-shadow: 0 0 28px rgba(154, 105, 255, .72);
+        }
+
+        .question-icon svg {
+            width: 32px;
+            height: 32px;
+            stroke-width: 2.4;
+        }
+
+        .question-field {
+            margin: 0 0 22px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+        }
+
+        .question-text {
+            max-width: 760px;
+            margin: 0 auto;
+            color: #fff;
+            font-size: clamp(24px, 2.3vw, 34px);
+            line-height: 1.25;
+            text-align: center;
+            text-shadow: 0 2px 18px rgba(0, 0, 0, .36);
+        }
+
+        .options-list {
+            display: grid;
+            gap: 12px;
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .option-item {
+            position: relative;
+            min-height: 66px;
+            margin: 0;
+            padding: 14px 20px;
+            border: 1px solid rgba(169, 151, 233, .38);
+            border-radius: 12px;
+            color: rgba(255, 255, 255, .9);
+            background: rgba(21, 20, 67, .58);
+            box-shadow: inset 0 0 24px rgba(126, 93, 234, .08);
+            transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease;
+        }
+
+        .option-item:hover {
+            transform: translateY(-1px);
+            border-color: rgba(183, 138, 255, .82);
+            box-shadow: 0 12px 26px rgba(74, 39, 145, .2), inset 0 0 26px rgba(126, 93, 234, .14);
+        }
+
+        .option-item.selected-answer {
+            border-color: #aa7cff;
+            background: linear-gradient(90deg, rgba(105, 73, 222, .42), rgba(83, 38, 166, .5));
+            box-shadow: 0 0 18px rgba(156, 109, 255, .42), inset 0 0 30px rgba(156, 109, 255, .2);
+        }
+
+        .option-item.correct-answer {
+            border-color: var(--game-green);
+            background: linear-gradient(90deg, rgba(42, 175, 145, .38), rgba(36, 92, 89, .5));
+            box-shadow: 0 0 20px rgba(135, 241, 221, .38), inset 0 0 28px rgba(135, 241, 221, .16);
+        }
+
+        .option-item.selected-wrong {
+            border-color: var(--game-red);
+            background: linear-gradient(90deg, rgba(203, 61, 123, .38), rgba(93, 27, 73, .5));
+            box-shadow: 0 0 20px rgba(255, 108, 174, .35), inset 0 0 28px rgba(255, 108, 174, .14);
+        }
+
+        .option-item label,
+        .option-item.correct-answer label,
+        .option-item.selected-wrong label {
+            color: #fff;
+            font-size: 22px;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .option-item input[type="radio"],
+        .option-item input[type="checkbox"] {
+            appearance: none;
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            width: 32px;
+            height: 32px;
+            margin: 0 12px 0 0;
+            border: 2px solid rgba(202, 198, 235, .56);
+            border-radius: 50%;
+            background: rgba(6, 6, 30, .18);
+        }
+
+        .option-item input[type="checkbox"] {
+            border-radius: 8px;
+        }
+
+        .option-item.selected-answer input {
+            border-color: #bda0ff;
+            background: #d6ccff;
+        }
+
+        .option-item.selected-answer input::before {
+            content: "✓";
+            color: var(--game-purple-strong);
+            font-size: 22px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .option-item.correct-answer input {
+            border-color: var(--game-green);
+            background: var(--game-green);
+        }
+
+        .option-item.correct-answer input::before {
+            content: "✓";
+            color: #0b4f47;
+            font-size: 22px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .option-item.selected-wrong input {
+            border-color: #ff83bd;
+            background: #ff83bd;
+        }
+
+        .option-item.selected-wrong input::before {
+            content: "×";
+            color: #451129;
+            font-size: 25px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .option-item input:disabled,
+        .option-item input:disabled + label {
+            opacity: 1;
+            color: #fff;
+        }
+
+        .explanation-section {
+            position: relative;
+            max-width: 860px;
+            margin: 16px auto 0;
+            padding: 18px 22px 18px 92px;
+            border: 1px solid rgba(156, 109, 255, .62);
+            border-radius: 12px;
+            color: #fff;
+            background: linear-gradient(90deg, rgba(68, 49, 148, .55), rgba(113, 55, 218, .42));
+            box-shadow: inset 0 0 28px rgba(156, 109, 255, .16);
+        }
+
+        .explanation-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            display: grid;
+            place-items: center;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            color: #d8c4ff;
+            background: radial-gradient(circle, rgba(121, 87, 217, .62), rgba(69, 48, 143, .72));
+            box-shadow: 0 0 26px rgba(156, 109, 255, .42);
+            transform: translateY(-50%);
+        }
+
+        .explanation-icon svg {
+            width: 28px;
+            height: 28px;
+            stroke-width: 2.2;
+        }
+
+        .explanation-title {
+            color: #c5a8ff;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .explanation-text {
+            margin-top: 6px;
+            color: rgba(255, 255, 255, .88);
+            font-size: 16px;
+            line-height: 1.45;
+        }
+
+        .button-group {
+            margin-top: 18px;
+        }
+
+        .submit-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: min(100%, 520px);
+            min-height: 62px;
+            padding: 0 34px;
+            border-radius: 999px;
+            color: #fff;
+            background: linear-gradient(90deg, #6480ff, #b33eff);
+            font-size: 22px;
+            font-weight: 900;
+            box-shadow: 0 16px 40px rgba(116, 76, 255, .34);
+        }
+
+        .submit-btn svg {
+            width: 28px;
+            height: 28px;
+            margin-left: 12px;
+            stroke-width: 2.6;
+        }
+
+        .error-message {
+            max-width: 860px;
+            color: #ffd7e7;
+            background: rgba(117, 22, 66, .52);
+            border: 1px solid rgba(255, 108, 174, .42);
+            border-radius: 10px;
+            font-weight: 800;
+        }
+
+        .tip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: min(100%, 760px);
+            margin: 16px auto 0;
+            padding: 12px 20px;
+            border: 1px solid rgba(156, 109, 255, .28);
+            border-radius: 12px;
+            color: rgba(255, 255, 255, .78);
+            background: rgba(28, 24, 72, .62);
+            box-shadow: 0 12px 30px rgba(44, 28, 102, .18);
+            backdrop-filter: blur(10px);
+            font-size: 16px;
+        }
+
+        .tip-icon {
+            width: 22px;
+            height: 22px;
+            color: #ba8fff;
+        }
+
+        .cat-overlay-backdrop {
+            background:
+                linear-gradient(180deg, rgba(5, 4, 19, .45), rgba(5, 4, 19, .65)),
+                url('/images/space_for_game.png') center / cover no-repeat;
+        }
+
+        .cat-overlay-card {
+            color: #fff;
+            background: rgba(13, 12, 42, .9);
+            border-color: rgba(156, 109, 255, .42);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, .42);
+        }
+
+        .cat-overlay-card h2,
+        .cat-leaderboard h3,
+        .cat-bet label,
+        .cat-muted,
+        .cat-stake-timer {
+            color: #fff;
+        }
+
+        .cat-overlay-hint,
+        .cat-leaderboard-table {
+            color: rgba(255, 255, 255, .82);
+        }
+
+        .cat-leaderboard-table th {
+            color: #fff;
+            background: rgba(97, 70, 190, .32);
+        }
+
+        .cat-leaderboard-table td {
+            border-bottom-color: rgba(156, 109, 255, .22);
+        }
+
+        #catBetInput {
+            color: #fff;
+            background: rgba(18, 16, 55, .7);
+            border-color: rgba(156, 109, 255, .42);
+        }
+
+        .cat-btn-primary {
+            background: linear-gradient(90deg, #6480ff, #b33eff);
+        }
+
+        .cat-overlay {
+            z-index: 8;
+            align-items: flex-start;
+            padding: 76px 28px 34px;
+        }
+
+        .cat-overlay-backdrop {
+            background:
+                radial-gradient(circle at 88% 76%, rgba(172, 42, 255, .34), transparent 22%),
+                linear-gradient(180deg, rgba(4, 3, 18, .18), rgba(4, 3, 18, .28)),
+                url('/images/space_for_game.png') center / cover fixed no-repeat;
+        }
+
+        .cat-overlay-card {
+            width: min(100%, 1320px);
+            min-height: auto;
+            padding: 0;
+            border: 0;
+            color: #fff;
+            background: transparent;
+            box-shadow: none;
+            gap: 0;
+        }
+
+        .cat-hero {
+            position: relative;
+            display: grid;
+            justify-items: center;
+            margin: 0 auto 78px;
+            text-align: center;
+        }
+
+        .cat-overlay-card h2 {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 22px;
+            margin: 0;
+            color: #fff;
+            font-size: clamp(40px, 4.4vw, 62px);
+            line-height: 1.05;
+            font-weight: 900;
+            letter-spacing: 0;
+            text-shadow: 0 8px 28px rgba(0, 0, 0, .38);
+        }
+
+        .cat-title-icon,
+        .cat-info-btn,
+        .cat-section-icon {
+            display: inline-grid;
+            place-items: center;
+            color: #b477ff;
+        }
+
+        .cat-title-icon svg {
+            width: clamp(48px, 4.3vw, 64px);
+            height: clamp(48px, 4.3vw, 64px);
+            filter: drop-shadow(0 0 16px rgba(177, 85, 255, .86));
+            stroke-width: 2.2;
+        }
+
+        .cat-overlay-hint {
+            margin: 18px 0 0;
+            color: #c3a5ff;
+            font-size: clamp(20px, 2vw, 30px);
+            font-weight: 500;
+        }
+
+        .cat-info-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cat-info-btn {
+            width: 48px;
+            height: 48px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+        }
+
+        .cat-info-btn svg {
+            width: 42px;
+            height: 42px;
+            stroke-width: 2;
+            filter: drop-shadow(0 0 12px rgba(177, 85, 255, .62));
+        }
+
+        .cat-info-popover {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 12px);
+            z-index: 3;
+            display: grid;
+            gap: 14px;
+            width: min(610px, calc(100vw - 48px));
+            padding: 18px 20px;
+            border: 1px solid rgba(179, 117, 255, .7);
+            border-radius: 14px;
+            color: rgba(255, 255, 255, .84);
+            background: rgba(16, 14, 49, .9);
+            box-shadow: 0 24px 60px rgba(31, 17, 77, .4), inset 0 0 40px rgba(139, 92, 246, .1);
+            backdrop-filter: blur(14px);
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.35;
+            text-align: left;
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(0, -4px) scale(.98);
+            transition: opacity .16s ease, transform .16s ease;
+        }
+
+        .cat-info-wrap:hover .cat-info-popover,
+        .cat-info-wrap:focus-within .cat-info-popover {
+            opacity: 1;
+            transform: translate(0, 0) scale(1);
+        }
+
+        .cat-info-row {
+            display: grid;
+            grid-template-columns: 32px 1fr;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+        }
+
+        .cat-info-text {
+            min-width: 0;
+            white-space: nowrap;
+        }
+
+        .cat-info-popover svg {
+            width: 30px;
+            height: 30px;
+            color: #b477ff;
+            filter: drop-shadow(0 0 12px rgba(177, 85, 255, .5));
+            stroke-width: 2.2;
+        }
+
+        .cat-info-row:nth-child(2) svg {
+            color: var(--game-green);
+        }
+
+        .cat-info-row:nth-child(3) svg {
+            color: var(--game-red);
+        }
+
+        .cat-info-popover strong {
+            color: #86f0dc;
+        }
+
+        .cat-info-row:nth-child(3) strong {
+            color: #ff72b8;
+        }
+
+        .cat-game-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
+            gap: 34px;
+            width: min(100%, 1180px);
+            margin: 0 auto;
+            padding: 34px 42px;
+            border: 1px solid rgba(201, 86, 255, .88);
+            border-radius: 20px;
+            background:
+                radial-gradient(circle at 93% 100%, rgba(185, 61, 255, .28), transparent 30%),
+                linear-gradient(180deg, rgba(11, 10, 43, .74), rgba(8, 7, 31, .84));
+            box-shadow: 0 0 26px rgba(201, 86, 255, .42), inset 0 0 58px rgba(123, 80, 231, .14);
+            backdrop-filter: blur(13px);
+        }
+
+        .cat-leaderboard {
+            padding-right: 34px;
+            border-right: 1px solid rgba(179, 75, 255, .58);
+        }
+
+        .cat-leaderboard h3,
+        .cat-bet label {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin: 0 0 28px;
+            color: #fff;
+            font-size: 30px;
+            font-weight: 900;
+        }
+
+        .cat-section-icon {
+            width: 58px;
+            height: 58px;
+            border-radius: 16px;
+            background: rgba(99, 49, 184, .42);
+            box-shadow: inset 0 0 22px rgba(177, 85, 255, .16), 0 0 18px rgba(177, 85, 255, .18);
+        }
+
+        .cat-section-icon svg {
+            width: 34px;
+            height: 34px;
+            stroke-width: 2.1;
+        }
+
+        .cat-leaderboard-table {
+            margin: 0;
+            color: #fff;
+            border-collapse: separate;
+            border-spacing: 0 14px;
+            font-size: 22px;
+        }
+
+        .cat-leaderboard-table th {
+            padding: 0 14px 8px;
+            color: #bda4ff;
+            background: transparent;
+            border: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .cat-leaderboard-table td {
+            padding: 20px 14px;
+            border-top: 1px solid rgba(155, 119, 230, .38);
+            border-bottom: 1px solid rgba(155, 119, 230, .38);
+            background: rgba(11, 10, 43, .42);
+            text-align: left;
+        }
+
+        .cat-leaderboard-table td:first-child {
+            border-left: 1px solid rgba(155, 119, 230, .38);
+            border-radius: 10px 0 0 10px;
+        }
+
+        .cat-leaderboard-table td:last-child {
+            border-right: 1px solid rgba(155, 119, 230, .38);
+            border-radius: 0 10px 10px 0;
+            color: #b477ff;
+            font-weight: 900;
+        }
+
+        .cat-leaderboard-table tbody tr:first-child td {
+            border-color: rgba(201, 86, 255, .92);
+            box-shadow: 0 0 18px rgba(201, 86, 255, .32);
+        }
+
+        .cat-leaderboard-table tbody tr:first-child td:first-child {
+            color: #ffe74e;
+        }
+
+        .cat-rank {
+            display: inline-grid;
+            place-items: center;
+            width: 44px;
+            height: 44px;
+            border: 2px solid rgba(155, 119, 230, .72);
+            border-radius: 50%;
+            color: #c9bbff;
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .cat-leaderboard-table tbody tr:first-child .cat-rank {
+            border-color: #ffe74e;
+            color: #ffe74e;
+            box-shadow: 0 0 18px rgba(255, 231, 78, .26);
+        }
+
+        .cat-leaderboard-placeholder td {
+            color: #bda4ff;
+            font-size: 18px;
+        }
+
+        .cat-bet {
+            margin: 0;
+        }
+
+        .cat-bet-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 130px;
+            gap: 18px;
+        }
+
+        .cat-stake-control {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 76px;
+            min-height: 92px;
+            border: 1px solid rgba(220, 82, 255, .92);
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(9, 8, 38, .62);
+            box-shadow: 0 0 18px rgba(201, 86, 255, .28);
+        }
+
+        #catBetInput {
+            min-width: 0;
+            min-height: 92px;
+            padding: 0 30px;
+            border: 0;
+            border-radius: 0;
+            color: #fff;
+            background: transparent;
+            font-size: 64px;
+            font-weight: 900;
+            text-align: left;
+            outline: none;
+            box-shadow: none;
+            appearance: textfield;
+        }
+
+        #catBetInput::-webkit-outer-spin-button,
+        #catBetInput::-webkit-inner-spin-button {
+            appearance: none;
+            margin: 0;
+        }
+
+        .cat-stepper {
+            display: grid;
+            border-left: 1px solid rgba(155, 119, 230, .34);
+        }
+
+        .cat-step-btn {
+            display: grid;
+            place-items: center;
+            min-height: 46px;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            color: #fff;
+            background: rgba(31, 24, 76, .56);
+        }
+
+        .cat-step-btn + .cat-step-btn {
+            border-top: 1px solid rgba(155, 119, 230, .34);
+        }
+
+        .cat-step-btn:hover {
+            background: rgba(103, 58, 192, .44);
+        }
+
+        .cat-step-btn svg {
+            width: 30px;
+            height: 30px;
+        }
+
+        .cat-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 92px;
+            padding: 0 20px;
+            border: 1px solid rgba(179, 117, 255, .62);
+            border-radius: 12px;
+            color: #fff;
+            background: rgba(13, 12, 48, .58);
+            font-size: 26px;
+            font-weight: 800;
+            box-shadow: inset 0 0 24px rgba(156, 109, 255, .08);
+        }
+
+        .cat-btn-secondary:hover {
+            border-color: rgba(220, 82, 255, .92);
+            color: #d49bff;
+            box-shadow: 0 0 16px rgba(201, 86, 255, .24);
+        }
+
+        .cat-btn-primary {
+            width: 100%;
+            min-height: 74px;
+            margin-top: 20px;
+            border: 1px solid rgba(255, 158, 245, .52);
+            border-radius: 14px;
+            background: linear-gradient(90deg, #5538ff, #e042d6);
+            font-size: 30px;
+            box-shadow: 0 14px 34px rgba(163, 66, 255, .34), inset 0 0 18px rgba(255, 255, 255, .12);
+        }
+
+        .cat-bet-score {
+            margin: 18px 0 0;
+            color: #bda4ff;
+            font-size: 24px;
+        }
+
+        .cat-bet-score strong {
+            color: #c957ff;
+            font-size: 1.1em;
+        }
+
+        .cat-bet-lock {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 20px 0 0;
+            color: #bda4ff;
+            font-size: 20px;
+        }
+
+        .cat-bet-lock svg {
+            width: 28px;
+            height: 28px;
+            color: #b477ff;
+        }
+
+        .cat-error {
+            margin: 12px 0 0;
+            color: #ffc4dc;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .cat-stake-timer {
+            display: none;
+        }
+
+        @media (max-width: 1100px) {
+            .main-content {
+                padding: 18px 18px 28px;
+            }
+
+            .container {
+                width: 100%;
+            }
+
+            .sidebar {
+                position: fixed;
+                left: clamp(14px, 2vw, 24px);
+                top: 18px;
+            }
+
+            .nav-btn {
+                width: 56px;
+                min-width: 56px;
+                height: 56px;
+                min-height: 56px;
+                padding: 0;
+                border-radius: 12px;
+                font-size: 0;
+            }
+
+            .nav-btn svg {
+                width: 28px;
+                height: 28px;
+            }
+
+            .nav-btn::after {
+                content: "Выйти из квиза";
+                position: absolute;
+                left: calc(100% + 10px);
+                top: 50%;
+                width: max-content;
+                max-width: 170px;
+                padding: 8px 10px;
+                border-radius: 8px;
+                color: #fff;
+                background: #17133f;
+                font-size: 12px;
+                font-weight: 900;
+                opacity: 0;
+                pointer-events: none;
+                transform: translate(-4px, -50%);
+                transition: opacity .16s ease, transform .16s ease;
+            }
+
+            .nav-btn:hover::after,
+            .nav-btn:focus-visible::after {
+                opacity: 1;
+                transform: translate(0, -50%);
+            }
+
+            .progress-info {
+                position: fixed;
+                top: 18px;
+                right: clamp(14px, 2vw, 24px);
+            }
+
+            .progress-item:nth-child(2) .progress-value {
+                min-width: 112px;
+                min-height: 56px;
+                padding: 0 14px;
+                border-radius: 12px;
+                font-size: 18px;
+            }
+
+            .header {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                width: min(100%, calc(100vw - 220px));
+                min-height: 56px;
+                padding: 0;
+            }
+
+            .header h1 {
+                overflow: hidden;
+                max-width: 100%;
+                font-size: clamp(28px, 4vw, 38px);
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .quiz-info {
+                margin-top: 4px;
+                font-size: 15px;
+            }
+
+            .game-progress {
+                margin-top: 16px;
+            }
+
+            .question-section {
+                padding: 24px 16px 28px;
+                border-radius: 18px;
+            }
+
+            .question-icon {
+                width: 50px;
+                height: 50px;
+            }
+
+            .option-item {
+                min-height: 58px;
+                padding: 12px 14px;
+            }
+
+            .option-item label,
+            .option-item.correct-answer label,
+            .option-item.selected-wrong label {
+                font-size: 18px;
+            }
+
+            .submit-btn {
+                min-width: 100%;
+                font-size: 19px;
+            }
+
+            .tip {
+                align-items: flex-start;
+                font-size: 14px;
+            }
+
+            .cat-overlay {
+                padding: 94px 18px 26px;
+            }
+
+            .cat-hero {
+                margin-bottom: 34px;
+            }
+
+            .cat-overlay-card h2 {
+                gap: 12px;
+                font-size: clamp(30px, 6vw, 44px);
+            }
+
+            .cat-info-popover {
+                left: auto;
+                right: 0;
+                top: calc(100% + 12px);
+                transform: translate(0, -4px) scale(.98);
+            }
+
+            .cat-info-wrap:hover .cat-info-popover,
+            .cat-info-wrap:focus-within .cat-info-popover {
+                transform: translate(0, 0) scale(1);
+            }
+
+            .cat-game-card {
+                grid-template-columns: 1fr;
+                gap: 26px;
+                padding: 24px 18px;
+            }
+
+            .cat-leaderboard {
+                padding-right: 0;
+                padding-bottom: 26px;
+                border-right: 0;
+                border-bottom: 1px solid rgba(179, 75, 255, .58);
+            }
+
+            .cat-leaderboard h3,
+            .cat-bet label {
+                font-size: 24px;
+            }
+
+            .cat-bet-row {
+                grid-template-columns: 1fr;
+            }
+
+            .cat-stake-control,
+            .cat-btn {
+                min-height: 74px;
+            }
+
+            #catBetInput {
+                min-height: 74px;
+                font-size: 46px;
+            }
+
+            .cat-btn {
+                font-size: 22px;
+            }
+
+            .cat-btn-primary {
+                min-height: 66px;
+                font-size: 24px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .main-content {
+                padding-inline: 12px;
+            }
+
+            .nav-btn {
+                width: 50px;
+                min-width: 50px;
+                height: 50px;
+                min-height: 50px;
+            }
+
+            .progress-item:nth-child(2) .progress-value {
+                min-width: 92px;
+                min-height: 50px;
+                gap: 6px;
+                padding: 0 10px;
+                font-size: 15px;
+            }
+
+            .time-icon {
+                width: 19px;
+                height: 19px;
+            }
+
+            .header {
+                width: min(100%, calc(100vw - 176px));
+                min-height: 50px;
+            }
+
+            .header h1 {
+                font-size: 26px;
+            }
+        }
+    </style>
+</head>
+<body class="page-initializing">
+    <div class="sidebar">
+        <a href="/home" class="nav-btn" onclick="event.preventDefault(); exitAttempt('/home');">Главная</a>
+        <a href="#" class="nav-btn" onclick="event.preventDefault(); exitAttempt('/home');">
+            <i data-lucide="arrow-left" aria-hidden="true"></i>
+            <span>Выйти из квиза</span>
+        </a>
+    </div>
+
+    <div class="main-content">
+        <div class="container">
+            <header class="header">
+                <h1 th:text="${quizName}">Название квиза</h1>
+                <div class="quiz-info">
+                    <span>Вопрос <span id="currentQuestionNum">1</span> из <span id="totalQuestions" th:text="${totalQuestions != null ? totalQuestions : 10}">10</span></span>
+                </div>
+            </header>
+            <div class="game-progress" aria-hidden="true">
+                <span class="game-progress-fill" style="--progress:10%"></span>
+            </div>
+
+            <div class="content-section">
+                <div class="progress-info">
+                    <div class="progress-item">
+                        <div class="progress-label">Осталось вопросов</div>
+                        <div class="progress-value" id="questionsRemaining" th:text="${questionsRemaining}">10</div>
+                    </div>
+                    <div class="progress-item">
+                        <div class="progress-label">Осталось времени</div>
+                        <div class="progress-value" id="timeRemaining"
+                             th:attr="data-default-time=${defaultTimeLimit != null ? defaultTimeLimit : 60}">
+                            <i class="time-icon" data-lucide="clock" aria-hidden="true"></i>
+                            <span class="time-text" th:text="${timeRemaining} + ' сек'">60 сек</span>
+                        </div>
+                    </div>
+                    <div class="progress-item" id="multiplayerStatus" style="display: none;">
+                        <div class="progress-label">Статус соперника</div>
+                        <div class="progress-value" id="opponentStatus">Ожидание...</div>
+                    </div>
+                </div>
+
+                <div id="catInBagOverlay"
+                     class="cat-overlay"
+                     th:classappend="${currentQuestion != null and currentQuestion.isCatInBagStakeScreen != null and currentQuestion.isCatInBagStakeScreen} ? '' : ' cat-overlay-hidden'"
+                     th:attr="aria-hidden=${currentQuestion != null and currentQuestion.isCatInBagStakeScreen != null and currentQuestion.isCatInBagStakeScreen} ? 'false' : 'true'">
+                    <div class="cat-overlay-backdrop"></div>
+                    <div class="cat-overlay-card" role="dialog" aria-labelledby="catInBagTitle">
+                        <div class="cat-hero">
+                            <h2 id="catInBagTitle">
+                                <span class="cat-title-icon" aria-hidden="true"><i data-lucide="circle-help"></i></span>
+                                <span>Кот в мешке</span>
+                                <span class="cat-info-wrap">
+                                    <button type="button" class="cat-info-btn" aria-label="Информация о ставке">
+                                        <i data-lucide="info"></i>
+                                    </button>
+                                    <span class="cat-info-popover" role="tooltip">
+                                        <span class="cat-info-row">
+                                            <i data-lucide="coins" aria-hidden="true"></i>
+                                            <span class="cat-info-text">Ставка: от 0 до вашего текущего счета</span>
+                                        </span>
+                                        <span class="cat-info-row">
+                                            <i data-lucide="circle-check" aria-hidden="true"></i>
+                                            <span class="cat-info-text">Верный ответ: <strong>+1</strong> + ставка</span>
+                                        </span>
+                                        <span class="cat-info-row">
+                                            <i data-lucide="circle-x" aria-hidden="true"></i>
+                                            <span class="cat-info-text">Неверный ответ: <strong>-</strong> ставка</span>
+                                        </span>
+                                    </span>
+                                </span>
+                            </h2>
+                            <p class="cat-overlay-hint">Сделайте ставку перед следующим вопросом</p>
+                        </div>
+                        <div class="cat-game-card">
+                        <section class="cat-leaderboard" aria-label="Текущий рейтинг в сессии">
+                            <h3><span class="cat-section-icon"><i data-lucide="trophy"></i></span> Текущий рейтинг</h3>
+                            <div id="catLeaderboardError" class="cat-error" style="display:none;"></div>
+                            <table class="cat-leaderboard-table">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Место</th>
+                                    <th scope="col">Игрок</th>
+                                    <th scope="col">Очки</th>
+                                </tr>
+                                </thead>
+                                <tbody id="catLeaderboardList">
+                                <tr class="cat-leaderboard-placeholder">
+                                    <td colspan="3">Загрузка рейтинга...</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </section>
+                        <section class="cat-bet" aria-label="Ставка">
+                            <label for="catBetInput"><span class="cat-section-icon"><i data-lucide="coins"></i></span> Ваша ставка</label>
+                            <div class="cat-bet-row">
+                                <div class="cat-stake-control">
+                                    <input type="number" id="catBetInput" inputmode="numeric" min="0" step="1" value="0" />
+                                    <div class="cat-stepper" aria-label="Изменить ставку">
+                                        <button type="button" id="catBetIncrement" class="cat-step-btn" aria-label="Увеличить ставку">
+                                            <i data-lucide="chevron-up"></i>
+                                        </button>
+                                        <button type="button" id="catBetDecrement" class="cat-step-btn" aria-label="Уменьшить ставку">
+                                            <i data-lucide="chevron-down"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button type="button" id="catBetAllIn" class="cat-btn cat-btn-secondary">All in</button>
+                            </div>
+                            <p id="catBetValidationError" class="cat-error" style="display:none;"></p>
+                            <p class="cat-muted cat-bet-score">Ваш текущий счёт: <strong id="catCurrentScoreDisplay">0</strong></p>
+                            <button type="button" id="catBetConfirm" class="cat-btn cat-btn-primary">Подтвердить ставку</button>
+                            <p class="cat-muted cat-bet-lock"><i data-lucide="lock-keyhole" aria-hidden="true"></i> Ставка будет применена после подтверждения</p>
+                            <p id="catStakeTimerText" class="cat-stake-timer">60 сек</p>
+                        </section>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="questionContentWrapper"
+                     th:classappend="${currentQuestion != null and currentQuestion.isCatInBagStakeScreen != null and currentQuestion.isCatInBagStakeScreen} ? ' cat-question-hidden' : ''">
+                    <form id="answerForm" onsubmit="submitAnswer(event)"
+                          th:data-question-type="${currentQuestion != null and currentQuestion.type != null ? currentQuestion.type.name() : 'SINGLE_CHOICE'}"
+                          th:data-is-cat-stake-screen="${currentQuestion != null and currentQuestion.isCatInBagStakeScreen != null ? currentQuestion.isCatInBagStakeScreen : false}">
+                        <input type="hidden" id="attemptIdInput" th:value="${attemptId}">
+                        <input type="hidden" id="quizId" th:value="${quizId}">
+                        <input type="hidden" id="currentQuestionId" th:value="${currentQuestion != null ? currentQuestion.id : ''}">
+                        <div class="question-section">
+                            <div class="question-icon" aria-hidden="true">
+                                <i data-lucide="circle-help"></i>
+                            </div>
+                            <div class="question-field">
+                                <div class="question-text" id="questionText" th:text="${currentQuestion != null ? currentQuestion.text : 'Загрузка вопроса...'}">
+                                    Текст вопроса
+                                </div>
+                            </div>
+
+                            <ul class="options-list" id="optionsList">
+                                <li class="option-item">
+                                    <!-- Без статического type="radio" при непройденном Thymeleaf браузер рисует type=text -->
+                                    <input type="radio"
+                                           th:type="${currentQuestion != null and currentQuestion.type != null and currentQuestion.type.name() == 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}"
+                                           name="answer"
+                                           id="option-0"
+                                           th:value="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 0 ? currentQuestion.options[0].id : ''}"
+                                           th:disabled="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() == 0}">
+                                    <label for="option-0"
+                                           th:text="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 0 ? currentQuestion.options[0].text : 'Загрузка варианта ответа...'}">
+                                        Вариант ответа 1
+                                    </label>
+                                </li>
+                                <li class="option-item">
+                                    <input type="radio"
+                                           th:type="${currentQuestion != null and currentQuestion.type != null and currentQuestion.type.name() == 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}"
+                                           name="answer"
+                                           id="option-1"
+                                           th:value="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 1 ? currentQuestion.options[1].id : ''}"
+                                           th:disabled="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 1}">
+                                    <label for="option-1"
+                                           th:text="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 1 ? currentQuestion.options[1].text : 'Загрузка варианта ответа...'}">
+                                        Вариант ответа 2
+                                    </label>
+                                </li>
+                                <li class="option-item">
+                                    <input type="radio"
+                                           th:type="${currentQuestion != null and currentQuestion.type != null and currentQuestion.type.name() == 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}"
+                                           name="answer"
+                                           id="option-2"
+                                           th:value="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 2 ? currentQuestion.options[2].id : ''}"
+                                           th:disabled="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 2}">
+                                    <label for="option-2"
+                                           th:text="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 2 ? currentQuestion.options[2].text : 'Загрузка варианта ответа...'}">
+                                        Вариант ответа 3
+                                    </label>
+                                </li>
+                                <li class="option-item">
+                                    <input type="radio"
+                                           th:type="${currentQuestion != null and currentQuestion.type != null and currentQuestion.type.name() == 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}"
+                                           name="answer"
+                                           id="option-3"
+                                           th:value="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 3 ? currentQuestion.options[3].id : ''}"
+                                           th:disabled="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 3}">
+                                    <label for="option-3"
+                                           th:text="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 3 ? currentQuestion.options[3].text : 'Загрузка варианта ответа...'}">
+                                        Вариант ответа 4
+                                    </label>
+                                </li>
+                                <li class="option-item"
+                                    th:style="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 4} ? 'display:none' : ''">
+                                    <input type="radio"
+                                           th:type="${currentQuestion != null and currentQuestion.type != null and currentQuestion.type.name() == 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}"
+                                           name="answer"
+                                           id="option-4"
+                                           th:value="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 4 ? currentQuestion.options[4].id : ''}"
+                                           th:disabled="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 4}">
+                                    <label for="option-4"
+                                           th:text="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 4 ? currentQuestion.options[4].text : 'Загрузка варианта ответа...'}">
+                                        Вариант ответа 5
+                                    </label>
+                                </li>
+                                <li class="option-item"
+                                    th:style="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 6} ? 'display:none' : ''">
+                                    <input type="radio"
+                                           th:type="${currentQuestion != null and currentQuestion.type != null and currentQuestion.type.name() == 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}"
+                                           name="answer"
+                                           id="option-5"
+                                           th:value="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 5 ? currentQuestion.options[5].id : ''}"
+                                           th:disabled="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 5}">
+                                    <label for="option-5"
+                                           th:text="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 5 ? currentQuestion.options[5].text : 'Загрузка варианта ответа...'}">
+                                        Вариант ответа 6
+                                    </label>
+                                </li>
+                                <li class="option-item"
+                                    th:style="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 7} ? 'display:none' : ''">
+                                    <input type="radio"
+                                           th:type="${currentQuestion != null and currentQuestion.type != null and currentQuestion.type.name() == 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}"
+                                           name="answer"
+                                           id="option-6"
+                                           th:value="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 6 ? currentQuestion.options[6].id : ''}"
+                                           th:disabled="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 6}">
+                                    <label for="option-6"
+                                           th:text="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 6 ? currentQuestion.options[6].text : 'Загрузка варианта ответа...'}">
+                                        Вариант ответа 7
+                                    </label>
+                                </li>
+                                <li class="option-item"
+                                    th:style="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 7} ? 'display:none' : ''">
+                                    <input type="radio"
+                                           th:type="${currentQuestion != null and currentQuestion.type != null and currentQuestion.type.name() == 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}"
+                                           name="answer"
+                                           id="option-7"
+                                           th:value="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 7 ? currentQuestion.options[7].id : ''}"
+                                           th:disabled="${currentQuestion == null or currentQuestion.options == null or currentQuestion.options.size() <= 7}">
+                                    <label for="option-7"
+                                           th:text="${currentQuestion != null and currentQuestion.options != null and currentQuestion.options.size() > 7 ? currentQuestion.options[7].text : 'Загрузка варианта ответа...'}">
+                                        Вариант ответа 8
+                                    </label>
+                                </li>
+                            </ul>
+
+                            <div class="explanation-section" id="explanationSection">
+                                <div class="explanation-icon" aria-hidden="true">
+                                    <i data-lucide="lightbulb"></i>
+                                </div>
+                                <div class="explanation-title">Объяснение</div>
+                                <div class="explanation-text" id="explanationText"></div>
+                            </div>
+
+                            <div class="button-group">
+                                <div id="errorMessage" class="error-message"></div>
+                                <button type="submit" class="submit-btn" id="submitButton">
+                                    <span class="submit-label">Ответить</span>
+                                    <i data-lucide="arrow-right" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="tip">
+                <i class="tip-icon" data-lucide="lightbulb" aria-hidden="true"></i>
+                <span><strong>Совет:</strong> Внимательно читайте вопрос и все варианты ответов перед выбором.</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script th:inline="javascript">
+        let attemptId = /*[[${attemptId}]]*/ null;
+        let timeRemaining = /*[[${timeRemaining}]]*/ null;
+        let timerInterval = null;
+        let questionsRemaining = /*[[${questionsRemaining}]]*/ null;
+        let catLeaderboardInterval = null;
+        let catLeaderboardLoading = false;
+        let catLeaderboardRequestId = 0;
+        let catLeaderboardLastRows = [];
+        let catLeaderboardHadSuccessfulLoad = false;
+        let stakeTimerInterval = null;
+        let stakeTimeLeft = 60;
+        const stakeTimerMs = 60000;
+
+        function getAttemptId() {
+            // Сначала берём id попытки из переменной, заполненной Thymeleaf.
+            if (attemptId) {
+                return attemptId.toString();
+            }
+            // Если не получилось, пробуем скрытое поле.
+            const hiddenInput = document.getElementById('attemptIdInput');
+            if (hiddenInput && hiddenInput.value) {
+                return hiddenInput.value;
+            }
+            // Последний вариант: достаём id из URL.
+            const path = window.location.pathname;
+            const match = path.match(/\/attempt\/(\d+)/);
+            if (match) {
+                return match[1];
+            }
+            
+            return null;
+        }
+
+        function markPageReady() {
+            window.requestAnimationFrame(function () {
+                window.requestAnimationFrame(function () {
+                    if (window.lucide) {
+                        lucide.createIcons();
+                    }
+                    updateSelectedOptionStyles();
+                    updateProgressBar();
+                    document.body.classList.remove('page-initializing');
+                });
+            });
+        }
+        
+        // Инициализируем attemptId и currentQuestionId после загрузки страницы.
+        window.addEventListener('DOMContentLoaded', function() {
+            const hiddenInput = document.getElementById('attemptIdInput');
+            if (hiddenInput && hiddenInput.value) {
+                attemptId = parseInt(hiddenInput.value);
+            }
+            sessionId = getSessionId();
+            
+            // Восстанавливаем currentQuestionId из скрытого поля.
+            const questionIdInput = document.getElementById('currentQuestionId');
+            if (questionIdInput && questionIdInput.value) {
+                currentQuestionId = parseInt(questionIdInput.value);
+            }
+            
+            // Пересчитываем номер текущего вопроса по оставшемуся количеству.
+            const totalQuestionsElement = document.getElementById('totalQuestions');
+            const currentQuestionNumElement = document.getElementById('currentQuestionNum');
+            const questionsRemainingElement = document.getElementById('questionsRemaining');
+            if (totalQuestionsElement && currentQuestionNumElement && questionsRemainingElement) {
+                const totalQuestions = parseInt(totalQuestionsElement.textContent) || 10;
+                const questionsRemaining = parseInt(questionsRemainingElement.textContent) || 0;
+                const currentQuestionNum = totalQuestions - questionsRemaining + 1;
+                currentQuestionNumElement.textContent = currentQuestionNum;
+            }
+            
+            const answerForm = document.getElementById('answerForm');
+            if (answerForm) {
+                const initialStakeScreen = answerForm.dataset.isCatStakeScreen === 'true';
+                if (initialStakeScreen) {
+                    setCatOverlayVisible(true);
+                } else {
+                    setCatOverlayVisible(false);
+                }
+                answerForm.addEventListener('change', function (e) {
+                    if (e.target && e.target.matches && e.target.matches('input[name="answer"]')) {
+                        hideError();
+                        updateSelectedOptionStyles();
+                    }
+                });
+            }
+            markPageReady();
+
+
+            var optionsList = document.getElementById('optionsList');
+            if (optionsList) {
+                optionsList.addEventListener('click', function (e) {
+                    if (e.target.closest('label') || e.target.tagName === 'INPUT') {
+                        return;
+                    }
+                    var li = e.target.closest('.option-item');
+                    if (!li) {
+                        return;
+                    }
+                    var input = li.querySelector('input[name="answer"]');
+                    if (!input || input.disabled) {
+                        return;
+                    }
+                    if (input.type === 'radio') {
+                        input.checked = true;
+                    } else {
+                        input.checked = !input.checked;
+                    }
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+
+            setupCatBetControls();
+        });
+
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.classList.add('show');
+            }
+        }
+
+        function hideError() {
+            const errorElement = document.getElementById('errorMessage');
+            if (errorElement) {
+                errorElement.classList.remove('show');
+                errorElement.textContent = '';
+            }
+        }
+
+        function updateSelectedOptionStyles() {
+            document.querySelectorAll('.option-item').forEach(function (item) {
+                var input = item.querySelector('input[name="answer"]');
+                item.classList.toggle('selected-answer', !!(input && input.checked));
+            });
+        }
+
+        function updateProgressBar() {
+            const totalQuestionsElement = document.getElementById('totalQuestions');
+            const currentQuestionNumElement = document.getElementById('currentQuestionNum');
+            const fill = document.querySelector('.game-progress-fill');
+            if (!totalQuestionsElement || !currentQuestionNumElement || !fill) {
+                return;
+            }
+
+            const total = parseInt(totalQuestionsElement.textContent, 10) || 1;
+            const current = Math.max(1, Math.min(total, parseInt(currentQuestionNumElement.textContent, 10) || 1));
+            fill.style.setProperty('--progress', ((current / total) * 100) + '%');
+        }
+
+        function refreshLucideIcons() {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        function renderTimeRemaining(seconds) {
+            const timeElement = document.getElementById('timeRemaining');
+            if (!timeElement) {
+                return;
+            }
+            timeElement.innerHTML = '<i class="time-icon" data-lucide="clock" aria-hidden="true"></i><span class="time-text">' + seconds + ' сек</span>';
+            refreshLucideIcons();
+        }
+
+        function isCatOverlayOpen() {
+            const overlay = document.getElementById('catInBagOverlay');
+            return !!(overlay && !overlay.classList.contains('cat-overlay-hidden'));
+        }
+
+        function setSubmitButtonLabel(button, label) {
+            if (!button) {
+                return;
+            }
+            button.innerHTML = '<span class="submit-label">' + label + '</span><i data-lucide="arrow-right" aria-hidden="true"></i>';
+            refreshLucideIcons();
+        }
+
+        function getCurrentCatScore() {
+            const scoreEl = document.getElementById('catCurrentScoreDisplay');
+            const parsed = parseInt(scoreEl ? scoreEl.textContent : '0', 10);
+            return isNaN(parsed) ? 0 : Math.max(0, parsed);
+        }
+
+        function clampCatStake(value) {
+            const maxScore = getCurrentCatScore();
+            const parsed = parseInt(value, 10);
+            if (isNaN(parsed)) {
+                return 0;
+            }
+            return Math.max(0, Math.min(maxScore, parsed));
+        }
+
+        function setCatStakeValue(value) {
+            const input = document.getElementById('catBetInput');
+            if (!input) {
+                return;
+            }
+            input.value = String(clampCatStake(value));
+        }
+
+        function showCatBetError(message) {
+            const err = document.getElementById('catBetValidationError');
+            if (err) {
+                err.textContent = message || '';
+                err.style.display = message ? 'block' : 'none';
+            }
+        }
+
+        async function submitCatStake() {
+            var btn = document.getElementById('catBetConfirm');
+            var input = document.getElementById('catBetInput');
+            if (!btn || !input) {
+                return;
+            }
+
+            showCatBetError('');
+            var rawStake = parseInt(input.value, 10);
+            var stake = clampCatStake(rawStake);
+            if (isNaN(rawStake) || rawStake !== stake) {
+                input.value = String(stake);
+            }
+
+            if (stake < 0 || stake > getCurrentCatScore()) {
+                showCatBetError('Ставка должна быть от 0 до вашего текущего счета.');
+                return;
+            }
+
+            btn.disabled = true;
+            try {
+                var res = await fetch('/api/attempts/stake', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
+                    },
+                    body: JSON.stringify({
+                        attemptId: parseInt(getAttemptId(), 10),
+                        stake: stake
+                    })
+                });
+                if (!res.ok) {
+                    var j = await res.json().catch(function () { return {}; });
+                    throw new Error(j.message || 'Ставка отклонена');
+                }
+                var question = await res.json();
+                clearStakeDeadline();
+                stopStakeTimer();
+                updateQuestionOnPage(question);
+                if (typeof resetTimer === 'function') resetTimer();
+            } catch (e) {
+                showCatBetError(e.message || 'Не удалось подтвердить ставку.');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function setupCatBetControls() {
+            const input = document.getElementById('catBetInput');
+            const confirmBtn = document.getElementById('catBetConfirm');
+            const allInBtn = document.getElementById('catBetAllIn');
+            const incBtn = document.getElementById('catBetIncrement');
+            const decBtn = document.getElementById('catBetDecrement');
+
+            if (input) {
+                input.addEventListener('input', function () {
+                    showCatBetError('');
+                    setCatStakeValue(input.value);
+                });
+                input.addEventListener('blur', function () {
+                    setCatStakeValue(input.value);
+                });
+            }
+
+            if (incBtn) {
+                incBtn.addEventListener('click', function () {
+                    setCatStakeValue((parseInt(input?.value || '0', 10) || 0) + 1);
+                });
+            }
+
+            if (decBtn) {
+                decBtn.addEventListener('click', function () {
+                    setCatStakeValue((parseInt(input?.value || '0', 10) || 0) - 1);
+                });
+            }
+
+            if (allInBtn) {
+                allInBtn.addEventListener('click', function () {
+                    setCatStakeValue(getCurrentCatScore());
+                });
+            }
+
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', submitCatStake);
+            }
+        }
+
+        function exitAttempt(targetUrl = '/home') {
+            if (confirm('Вы уверены, что хотите выйти из квиза?')) {
+                window.location.href = targetUrl;
+            }
+        }
+
+        let currentQuestionId = null;
+
+        async function submitAnswer(event, answerId = null) {
+            if (event) {
+                event.preventDefault();
+            }
+
+            const currentAttemptId = getAttemptId();
+            if (!currentAttemptId) {
+                alert('Ошибка: не удалось определить ID попытки. Пожалуйста, начните прохождение заново.');
+                window.location.href = '/home';
+                return;
+            }
+            
+            attemptId = parseInt(currentAttemptId);
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Ошибка: пользователь не авторизован');
+                window.location.href = '/login';
+                return;
+            }
+
+            const form = document.getElementById('answerForm');
+            const questionType = (form && form.dataset.questionType) ? form.dataset.questionType : 'SINGLE_CHOICE';
+            const isMultiple = questionType === 'MULTIPLE_CHOICE';
+
+            let selectedAnswer = answerId;
+            let selectedAnswerIds = [];
+
+            if (isMultiple) {
+                const checked = form ? form.querySelectorAll('input[name="answer"]:checked') : [];
+                selectedAnswerIds = Array.from(checked).map(function (el) { return parseInt(el.value, 10); });
+            } else if (!selectedAnswer && event) {
+                const formData = new FormData(form);
+                selectedAnswer = formData.get('answer');
+            }
+
+            const isTimeout = answerId === null && !event;
+
+            if (!isTimeout) {
+                const hasSelection = isMultiple ? selectedAnswerIds.length > 0 : !!selectedAnswer;
+                if (!hasSelection) {
+                    showError('Пожалуйста, выберите хотя бы один вариант ответа перед отправкой.');
+                    return;
+                }
+                hideError();
+            } else {
+                hideError();
+            }
+
+            if (!currentQuestionId) {
+                const questionIdInput = document.getElementById('currentQuestionId');
+                if (questionIdInput && questionIdInput.value) {
+                    currentQuestionId = questionIdInput.value;
+                }
+            }
+
+            const payload = {
+                attemptId: parseInt(attemptId, 10),
+                questionId: currentQuestionId ? parseInt(currentQuestionId, 10) : null
+            };
+            if (isMultiple) {
+                payload.selectedAnswerIds = isTimeout ? null : selectedAnswerIds;
+            } else {
+                payload.selectedAnswerId = selectedAnswer ? parseInt(selectedAnswer, 10) : null;
+            }
+
+            try {
+                const response = await fetch('/api/attempts/answer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    showAnswerResult(result);
+
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+
+                    const submitButton = document.getElementById('submitButton');
+
+                    if (submitButton) {
+                        if (result.nextQuestion) {
+                            setSubmitButtonLabel(submitButton, 'Следующий вопрос');
+                            submitButton.onclick = function(e) {
+                                e.preventDefault();
+                                if (sessionId) {
+                                    checkMultiplayerProgress();
+                                }
+                                resetAnswerState();
+
+                                updateQuestionOnPage(result.nextQuestion);
+                                updateQuestionsCounter();
+                                resetTimer();
+                                submitButton.onclick = null;
+
+                                submitButton.type = 'submit';
+                            };
+                            submitButton.type = 'button';
+                        } else {
+                            setSubmitButtonLabel(submitButton, 'Завершить квиз');
+                            submitButton.onclick = function(e) {
+                                e.preventDefault();
+                                if (sessionId) {
+                                    finishMultiplayerAttempt();
+                                } else {
+                                    const quizIdElement = document.getElementById('quizId');
+
+                                    let quizId = '';
+                                    if (quizIdElement && quizIdElement.value) {
+                                        quizId = quizIdElement.value;
+                                    } else if (result.quizId) {
+                                        quizId = result.quizId;
+                                    } else {
+                                        console.warn('QuizId не найден напрямую, пробуем закончить по attemptId без quizId');
+
+                                    }
+                                    if (quizId) {
+                                        window.location.href = '/quiz/attempt/' + attemptId + '/finish';
+                                    } else {
+                                        window.location.href = '/quiz/attempt/' + attemptId + '/finish';
+
+                                    }
+                                }
+                            };
+                            submitButton.type = 'button';
+                        }
+                    }
+                } else {
+                    let backendMessage = 'Не удалось отправить ответ';
+                    try {
+                        const error = await response.json();
+                        backendMessage = error.message || error.error || error.detail || backendMessage;
+                    } catch (jsonErr) {
+                        const text = await response.text().catch(() => '');
+                        if (text) {
+                            backendMessage = text;
+                        }
+                    }
+                    alert('Ошибка: ' + backendMessage);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка сети');
+            }
+        }
+
+        function getCorrectAnswerIds(result) {
+            if (result.correctAnswerIds && result.correctAnswerIds.length > 0) {
+                return result.correctAnswerIds.map(function (id) { return parseInt(id, 10); });
+            }
+            if (result.correctAnswerId != null) {
+                return [parseInt(result.correctAnswerId, 10)];
+            }
+            return [];
+        }
+
+        function showAnswerResult(result) {
+            document.querySelectorAll('#optionsList input[name="answer"]').forEach(function (input) {
+                input.disabled = true;
+            });
+            updateSelectedOptionStyles();
+
+            var correctIds = getCorrectAnswerIds(result);
+            document.querySelectorAll('#optionsList input[name="answer"]').forEach(function (input) {
+                var optionItem = input.closest('.option-item');
+                var id = parseInt(input.value, 10);
+                if (correctIds.indexOf(id) !== -1) {
+                    optionItem.classList.add('correct-answer');
+                } else if (input.checked && correctIds.indexOf(id) === -1) {
+                    optionItem.classList.add('selected-wrong');
+                }
+            });
+
+            const explanationSection = document.getElementById('explanationSection');
+            const explanationText = document.getElementById('explanationText');
+            if (explanationSection && explanationText) {
+                if (result.explanation) {
+                    explanationText.textContent = result.explanation;
+                    explanationSection.classList.add('show');
+                } else {
+                    explanationText.textContent = 'Объяснение отсутствует';
+                    explanationSection.classList.add('show');
+                }
+            }
+
+        }
+
+        function resetAnswerState() {
+            document.querySelectorAll('.option-item').forEach(item => {
+                item.classList.remove('selected-answer', 'correct-answer', 'selected-wrong');
+            });
+
+            document.querySelectorAll('#optionsList input[name="answer"]').forEach(function (input) {
+                input.disabled = false;
+            });
+
+            const explanationSection = document.getElementById('explanationSection');
+            if (explanationSection) {
+                explanationSection.classList.remove('show');
+            }
+
+            const submitButton = document.getElementById('submitButton');
+            if (submitButton) {
+                setSubmitButtonLabel(submitButton, 'Ответить');
+                submitButton.disabled = false;
+            }
+            updateSelectedOptionStyles();
+        }
+
+        function stopQuestionTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function setCatOverlayVisible(show) {
+            var overlay = document.getElementById('catInBagOverlay');
+            var wrap = document.getElementById('questionContentWrapper');
+            var multiplayerStatusEl = document.getElementById('multiplayerStatus');
+            var opponentStatusEl = document.getElementById('opponentStatus');
+            if (!overlay || !wrap) return;
+            if (show) {
+                document.body.classList.add('cat-stake-active');
+                overlay.classList.remove('cat-overlay-hidden');
+                wrap.classList.add('cat-question-hidden');
+                if (multiplayerStatusEl) {
+                    multiplayerStatusEl.style.display = 'none';
+                }
+                if (opponentStatusEl) {
+                    opponentStatusEl.textContent = 'Ожидание...';
+                }
+                stopQuestionTimer();
+                startCatLeaderboardPolling();
+                startStakeTimer60s();
+            } else {
+                document.body.classList.remove('cat-stake-active');
+                overlay.classList.add('cat-overlay-hidden');
+                wrap.classList.remove('cat-question-hidden');
+                stopCatLeaderboardPolling()
+                stopStakeTimer();
+            }
+        }
+
+        function startCatLeaderboardPolling() {
+            stopCatLeaderboardPolling();
+            loadCatLeaderboardAndScore(true);
+            catLeaderboardInterval = setInterval(function () {
+                loadCatLeaderboardAndScore(false);
+            }, 1000);
+        }
+        function stopCatLeaderboardPolling() {
+            if (catLeaderboardInterval) {
+                clearInterval(catLeaderboardInterval);
+                catLeaderboardInterval = null;
+            }
+        }
+
+        function renderCatLeaderboardLoading(list) {
+            if (!list) return;
+            list.innerHTML = '<tr class="cat-leaderboard-placeholder"><td colspan="3">Загрузка рейтинга...</td></tr>';
+        }
+
+        function renderCatLeaderboardEmpty(list) {
+            if (!list) return;
+            list.innerHTML = '<tr class="cat-leaderboard-placeholder"><td colspan="3">Нет данных рейтинга</td></tr>';
+        }
+
+        function renderCatLeaderboardRows(list, rows) {
+            if (!list) return;
+            list.innerHTML = '';
+            if (!rows || rows.length === 0) {
+                renderCatLeaderboardEmpty(list);
+                return;
+            }
+            (rows || []).forEach(function (p) {
+                var tr = document.createElement('tr');
+                var tdPos = document.createElement('td');
+                var rank = document.createElement('span');
+                rank.className = 'cat-rank';
+                rank.textContent = p.position != null ? String(p.position) : '';
+                tdPos.appendChild(rank);
+                var tdName = document.createElement('td');
+                tdName.textContent = p.username || '';
+                var tdScore = document.createElement('td');
+                tdScore.textContent = p.score != null ? String(p.score) : '';
+                tr.appendChild(tdPos);
+                tr.appendChild(tdName);
+                tr.appendChild(tdScore);
+                list.appendChild(tr);
+            });
+        }
+
+        function renderCachedCatLeaderboard(list) {
+            if (!list || !catLeaderboardLastRows.length) return false;
+            renderCatLeaderboardRows(list, catLeaderboardLastRows);
+            return true;
+        }
+
+        async function loadCatLeaderboardAndScore(isInitialLoad) {
+            if (catLeaderboardLoading) return;
+            catLeaderboardLoading = true;
+            const myRequestId = ++catLeaderboardRequestId;
+
+            var token = localStorage.getItem('token');
+            var attemptId = parseInt(getAttemptId(), 10);
+
+            var scoreEl = document.getElementById('catCurrentScoreDisplay');
+            var betInput = document.getElementById('catBetInput');
+            var list = document.getElementById('catLeaderboardList');
+            var errEl = document.getElementById('catLeaderboardError');
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+
+            if (!list) {
+                catLeaderboardLoading = false;
+                return;
+            }
+
+            if ((isInitialLoad && !catLeaderboardHadSuccessfulLoad) || !list.children.length) {
+                renderCatLeaderboardLoading(list);
+            }
+
+            if (!sessionId) {
+                catLeaderboardLoading = false;
+                return;
+            }
+
+            try {
+                var responses = await Promise.allSettled([
+                    fetch('/api/attempts/' + attemptId + '/score', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    }),
+                    fetch('/api/multiplayer/sessions/' + encodeURIComponent(sessionId) + '/live-leaderboard', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    })
+                ]);
+
+                if (myRequestId !== catLeaderboardRequestId) {
+                    catLeaderboardLoading = false;
+                    return;
+                }
+
+                var scoreResponse = responses[0];
+                if (scoreResponse.status === 'fulfilled' && scoreResponse.value.ok) {
+                    var sd = await scoreResponse.value.json();
+                    var sc = sd.score;
+                    if (scoreEl) scoreEl.textContent = String(sc);
+                    if (betInput) {
+                        betInput.max = sc > 0 ? String(sc) : '0';
+                        setCatStakeValue(betInput.value);
+                    }
+                }
+
+                var leaderboardResponse = responses[1];
+                if (leaderboardResponse.status !== 'fulfilled' || !leaderboardResponse.value.ok) {
+                    throw new Error('Рейтинг');
+                }
+
+                var payload = await leaderboardResponse.value.json();
+                var rows = Array.isArray(payload) ? payload : ((payload && payload.players) ? payload.players : []);
+                if (rows.length > 0) {
+                    catLeaderboardLastRows = rows;
+                    catLeaderboardHadSuccessfulLoad = true;
+                    renderCatLeaderboardRows(list, rows);
+                } else if (!catLeaderboardHadSuccessfulLoad) {
+                    renderCatLeaderboardEmpty(list);
+                } else {
+                    renderCachedCatLeaderboard(list);
+                }
+            } catch (e) {
+                console.warn(e);
+                if (errEl) {
+                    errEl.textContent = 'Не удалось загрузить рейтинг';
+                    errEl.style.display = 'block';
+                }
+                if (!renderCachedCatLeaderboard(list) && !list.children.length) {
+                    renderCatLeaderboardEmpty(list);
+                }
+            }
+            catLeaderboardLoading = false;
+        }
+
+        function stopStakeTimer() {
+            if (stakeTimerInterval) {
+                clearInterval(stakeTimerInterval);
+                stakeTimerInterval = null;
+            }
+        }
+
+        function getStakeTimerStorageKey() {
+            var questionId = document.getElementById('currentQuestionId')?.value || 'pending';
+            return 'catStakeDeadlineAt_' + getAttemptId() + '_' + questionId;
+        }
+
+        function getOrCreateStakeDeadlineMs() {
+            var key = getStakeTimerStorageKey();
+            var saved = sessionStorage.getItem(key);
+            if (saved) {
+                var parsed = parseInt(saved, 10);
+                if (!isNaN(parsed) && parsed > Date.now()) {
+                    return parsed;
+                }
+            }
+            var deadline = Date.now() + stakeTimerMs;
+            sessionStorage.setItem(key, String(deadline));
+            return deadline;
+        }
+
+        function clearStakeDeadline() {
+            sessionStorage.removeItem(getStakeTimerStorageKey());
+        }
+
+        function renderStakeTimerText() {
+            var timerEl = document.getElementById('catStakeTimerText');
+            if (timerEl) {
+                timerEl.textContent = stakeTimeLeft + ' сек';
+            }
+            renderTimeRemaining(stakeTimeLeft);
+        }
+
+        function startStakeTimer60s() {
+            // Останавливаем таймер вопроса, пока открыто окно ставки.
+            stopQuestionTimer();
+            stopStakeTimer();
+            var deadlineMs = getOrCreateStakeDeadlineMs();
+            stakeTimeLeft = Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+            renderStakeTimerText();
+            stakeTimerInterval = setInterval(async function () {
+                stakeTimeLeft = Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+                renderStakeTimerText();
+                if (stakeTimeLeft <= 0) {
+
+                    stakeTimeLeft = 0;
+                    renderStakeTimerText();
+                    stopStakeTimer();
+                    // Если пользователь не выбрал ставку, отправляем 0 автоматически.
+                    try {
+                        const rawStake = document.getElementById('catBetInput')?.value;
+                        let autoStake = clampCatStake(rawStake);
+
+                        var res = await fetch('/api/attempts/stake', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
+                            },
+                           body: JSON.stringify({
+                                attemptId: parseInt(getAttemptId(), 10),
+                                stake: autoStake
+                            })
+                        });
+                        if (!res.ok) {
+                            var j = await res.json().catch(function () { return {}; });
+                            throw new Error(j.message || 'Ставка отклонена');
+                        }
+                        var question = await res.json();
+                        clearStakeDeadline();
+                        updateQuestionOnPage(question);
+                        if (typeof resetTimer === 'function') resetTimer();
+                    } catch (e) {
+                        var err = document.getElementById('catBetValidationError');
+                        if (err) {
+                            err.textContent = e.message || 'Не удалось отправить ставку по таймеру';
+                            err.style.display = 'block';
+                        }
+                    }
+                }
+            }, 1000);
+        }
+
+        function updateQuestionOnPage(question) {
+            if (!question) {
+                return;
+            }
+
+            var isStakeScreen =
+                question.isCatInBagStakeScreen === true ||
+                question.catInBagStakeScreen === true ||
+                ((question.text === null || question.text === undefined || String(question.text).trim() === '') &&
+                    (!question.options || question.options.length === 0));
+
+            if (question.id) {
+                currentQuestionId = question.id;
+                const questionIdInput = document.getElementById('currentQuestionId');
+                if (questionIdInput) {
+                    questionIdInput.value = question.id;
+                }
+            }
+
+            if (isStakeScreen) {
+                 var form = document.getElementById('answerForm');
+                 if (form) {
+                     form.dataset.isCatStakeScreen = 'true';
+                 }
+                 setCatOverlayVisible(true);
+                 return;
+            }
+            setCatOverlayVisible(false);
+
+            var qType = 'SINGLE_CHOICE';
+            if (question.type) {
+                qType = typeof question.type === 'string' ? question.type : (question.type.name || question.type);
+            }
+            var form = document.getElementById('answerForm');
+            if (form) {
+                form.dataset.questionType = qType;
+                form.dataset.isCatStakeScreen = isStakeScreen ? 'true' : 'false';
+            }
+            var isMultiple = qType === 'MULTIPLE_CHOICE';
+
+            var questionTextElement = document.getElementById('questionText');
+            if (questionTextElement && question.text) {
+                questionTextElement.textContent = question.text;
+            }
+
+            var options = question.options || [];
+            for (var i = 0; i < 8; i++) {
+                var input = document.getElementById('option-' + i);
+                var label = input ? input.nextElementSibling : null;
+                 var li = input ? input.closest('.option-item') : null;
+
+                if (!input || !label || !li) {
+                    continue;
+                }
+
+                input.type = isMultiple ? 'checkbox' : 'radio';
+                input.name = 'answer';
+
+                if (options[i]) {
+                    li.style.display = '';
+                    input.value = options[i].id || '';
+                    label.textContent = options[i].text || '';
+                    input.disabled = false;
+                    input.style.opacity = '1';
+                    label.style.opacity = '1';
+                    input.style.cursor = 'pointer';
+                    label.style.cursor = 'pointer';
+                } else {
+                    li.style.display = 'none';
+                    input.value = '';
+                    label.textContent = '';
+                    input.disabled = true;
+                }
+                input.checked = false;
+                li.classList.remove('selected-answer', 'correct-answer', 'selected-wrong');
+            }
+            updateSelectedOptionStyles();
+            updateProgressBar();
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        function updateQuestionsCounter() {
+            const remainingElement = document.getElementById('questionsRemaining');
+            if (remainingElement) {
+                const current = parseInt(remainingElement.textContent) || 0;
+                if (current > 0) {
+                    const newValue = current - 1;
+                    remainingElement.textContent = newValue;
+                    questionsRemaining = newValue;
+                }
+            }
+            
+            const totalQuestionsElement = document.getElementById('totalQuestions');
+            const currentQuestionNumElement = document.getElementById('currentQuestionNum');
+            if (totalQuestionsElement && currentQuestionNumElement) {
+                const totalQuestions = parseInt(totalQuestionsElement.textContent) || 10;
+                const questionsRemaining = parseInt(document.getElementById('questionsRemaining')?.textContent) || 0;
+                const currentQuestionNum = totalQuestions - questionsRemaining + 1;
+                currentQuestionNumElement.textContent = currentQuestionNum;
+                updateProgressBar();
+            }
+        }
+
+        function resetTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            if (isCatOverlayOpen()) {
+                return;
+            }
+
+            const timeElement = document.getElementById('timeRemaining');
+            if (timeElement) {
+                const defaultTime = parseInt(timeElement.dataset.defaultTime) || 60;
+                timeRemaining = defaultTime;
+                renderTimeRemaining(timeRemaining);
+                
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            const timeElement = document.getElementById('timeRemaining');
+            if (!timeElement || !timeRemaining || isCatOverlayOpen()) return;
+
+            timerInterval = setInterval(() => {
+                timeRemaining = Math.max(0, timeRemaining - 1);
+                renderTimeRemaining(timeRemaining);
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    const remainingElement = document.getElementById('questionsRemaining');
+                    if (remainingElement) {
+                        questionsRemaining = parseInt(remainingElement.textContent) || 0;
+                    }
+                    if (!isCatOverlayOpen()) {
+                        submitAnswer(null, null);
+                    }
+                }
+            }, 1000);
+        }
+
+        let sessionId = null;
+        let multiplayerPollInterval = null;
+
+        function getSessionId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('sessionId');
+        }
+
+        async function checkMultiplayerProgress() {
+            if (!sessionId) return;
+            if (isCatOverlayOpen()) return;
+
+            try {
+                const currentQuestionId = document.getElementById('currentQuestionId')?.value;
+                const userId = localStorage.getItem('userId');
+                let url = `/api/multiplayer/sessions/${sessionId}/progress`;
+                const params = [];
+                if (currentQuestionId) {
+                    params.push(`questionId=${currentQuestionId}`);
+                }
+                if (userId) {
+                    params.push(`userId=${userId}`);
+                }
+                if (params.length > 0) {
+                    url += '?' + params.join('&');
+                }
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (!response.ok) return;
+
+                const progress = await response.json();
+                const statusEl = document.getElementById('opponentStatus');
+                const multiplayerStatusEl = document.getElementById('multiplayerStatus');
+
+                if (statusEl && multiplayerStatusEl) {
+                    multiplayerStatusEl.style.display = 'block';
+                    
+                    const bothAnswered = progress.bothAnswered || false;
+                    const currentQuestionAnswered = progress.currentQuestionAnswered || false;
+
+                    if (bothAnswered && currentQuestionId && progress.currentQuestionId == currentQuestionId) {
+                        statusEl.textContent = 'Оба ответили';
+                        statusEl.style.color = '#16a34a';
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    } else if (currentQuestionAnswered) {
+                        statusEl.textContent = 'Соперник ответил';
+                        statusEl.style.color = '#f59e0b';
+                    } else {
+                        statusEl.textContent = 'Ожидание соперника...';
+                        statusEl.style.color = '#6b7280';
+                    }
+                }
+            } catch (error) {
+                console.error('Multiplayer progress check error:', error);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            attemptId = getAttemptId();
+            sessionId = getSessionId();
+            
+            const timeElement = document.getElementById('timeRemaining');
+            const remainingElement = document.getElementById('questionsRemaining');
+            
+            if (remainingElement) {
+                questionsRemaining = parseInt(remainingElement.textContent) || 0;
+            }
+            
+            if (timeElement && !isCatOverlayOpen()) {
+                const defaultTime = parseInt(timeElement.dataset.defaultTime) || 60;
+                timeRemaining = defaultTime;
+                renderTimeRemaining(timeRemaining);
+                startTimer();
+            }
+
+            if (sessionId) {
+                multiplayerPollInterval = setInterval(checkMultiplayerProgress, 1500);
+            }
+        });
+
+        async function finishMultiplayerAttempt() {
+            try {
+                const response = await fetch(`/api/attempts/${attemptId}/finish`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    setTimeout(() => {
+                        window.location.href = `/quiz/attempt/${attemptId}/finish`;
+                    }, 1000);
+                } else {
+                    console.error('Failed to finish attempt');
+                    window.location.href = `/multiplayer/session/${sessionId}/results`;
+                }
+            } catch (error) {
+                console.error('Error finishing attempt:', error);
+                window.location.href = `/multiplayer/session/${sessionId}/results`;
+            }
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                stopStakeTimer();
+            }
+            stopCatLeaderboardPolling();
+            if (multiplayerPollInterval) {
+                clearInterval(multiplayerPollInterval);
+            }
+        });
+    </script>
+</body>
+</html>

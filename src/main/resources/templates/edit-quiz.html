@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование квиза - QuizArena</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            color: #0b1230;
+            background: #f7f8ff;
+            font-family: Arial, sans-serif;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button,
+        input,
+        textarea {
+            font: inherit;
+        }
+
+        .edit-page {
+            min-width: 0;
+        }
+
+        .hero {
+            position: relative;
+            min-height: 405px;
+            padding: 76px 52px 116px;
+            overflow: hidden;
+            color: #fff;
+            background:
+                linear-gradient(90deg, rgba(5, 7, 30, .96), rgba(8, 8, 42, .68)),
+                url('/images/space.png') center / cover no-repeat;
+        }
+
+        .hero h1 {
+            position: relative;
+            z-index: 1;
+            max-width: 680px;
+            font-size: clamp(36px, 4vw, 58px);
+            line-height: 1.02;
+            font-weight: 900;
+            letter-spacing: 0;
+            text-shadow: 0 8px 26px rgba(0, 0, 0, .42);
+        }
+
+        .hero p {
+            position: relative;
+            z-index: 1;
+            max-width: 560px;
+            margin-top: 24px;
+            font-size: 20px;
+            line-height: 1.55;
+        }
+
+        .hero-planet {
+            position: absolute;
+            right: clamp(-150px, -6vw, -72px);
+            bottom: -142px;
+            width: min(900px, 56vw);
+            opacity: .95;
+            filter: drop-shadow(0 24px 30px rgba(104, 52, 224, .42));
+            pointer-events: none;
+        }
+
+        .content {
+            min-width: 0;
+            padding: 24px 42px 30px;
+        }
+
+        form {
+            display: grid;
+            gap: 24px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+            gap: 24px;
+        }
+
+        .card,
+        .action-bar {
+            border: 1px solid #e2e4f1;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 18px 40px rgba(29, 34, 78, .08);
+        }
+
+        .card {
+            padding: 26px 28px 24px;
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+            font-size: 22px;
+            font-weight: 900;
+        }
+
+        .card-title svg {
+            width: 30px;
+            height: 30px;
+            color: #311cff;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label,
+        .group-label {
+            display: block;
+            margin-bottom: 10px;
+            color: #0d1538;
+            font-size: 16px;
+            font-weight: 900;
+        }
+
+        .input-wrap {
+            position: relative;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            border: 1px solid #dfe3ef;
+            border-radius: 8px;
+            color: #11183b;
+            background: #fff;
+            outline: none;
+            transition: border-color .16s ease, box-shadow .16s ease;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            min-height: 54px;
+            padding: 0 18px;
+            font-size: 17px;
+        }
+
+        textarea {
+            min-height: 146px;
+            padding: 18px;
+            resize: vertical;
+            font-size: 16px;
+            line-height: 1.45;
+        }
+
+        input:focus,
+        textarea:focus {
+            border-color: #6f5cff;
+            box-shadow: 0 0 0 3px rgba(49, 28, 255, .1);
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: #858aad;
+        }
+
+        .char-counter {
+            position: absolute;
+            right: 14px;
+            bottom: 12px;
+            color: #6f7599;
+            font-size: 13px;
+        }
+
+        .file-upload-section {
+            display: grid;
+            place-items: center;
+            min-height: 178px;
+            padding: 22px;
+            border: 1.5px dashed #4c36ff;
+            border-radius: 8px;
+            color: #3a2aff;
+            background: linear-gradient(180deg, rgba(247, 246, 255, .86), rgba(255, 255, 255, .96));
+            cursor: pointer;
+            text-align: center;
+            transition: border-color .16s ease, background .16s ease;
+        }
+
+        .file-upload-section:hover,
+        .file-upload-section.drag-over {
+            border-color: #2915ff;
+            background: #f4f1ff;
+        }
+
+        .file-upload-icon svg {
+            width: 48px;
+            height: 48px;
+            color: #3218ff;
+            stroke-width: 2.1;
+        }
+
+        .file-upload-label {
+            display: block;
+            margin-top: 12px;
+            color: #0f1640;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .file-upload-hint {
+            display: block;
+            margin-top: 8px;
+            color: #74799b;
+            line-height: 1.45;
+        }
+
+        .file-types {
+            display: block;
+            margin-top: 12px;
+            color: #2b1cff;
+            font-weight: 900;
+        }
+
+        .file-name {
+            margin-top: 10px;
+            color: #17a56f;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .field-note {
+            margin-top: 10px;
+            color: #777e9e;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .number-inputs {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 28px;
+            margin-bottom: 24px;
+        }
+
+        .stepper {
+            display: grid;
+            grid-template-columns: 1fr 46px 46px;
+            align-items: center;
+            overflow: hidden;
+            border: 1px solid #dfe3ef;
+            border-radius: 8px;
+        }
+
+        .stepper input {
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .stepper button {
+            display: grid;
+            place-items: center;
+            height: 54px;
+            border: 0;
+            color: #4b4f82;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .stepper button:hover {
+            color: #2f1cff;
+            background: #f4f1ff;
+        }
+
+        .stepper svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            margin: 0;
+            appearance: none;
+        }
+
+        .option-section {
+            margin-top: 22px;
+        }
+
+        .option-section:first-of-type {
+            margin-top: 0;
+        }
+
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .option-grid.three {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .radio-card {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-height: 86px;
+            padding: 18px;
+            border: 1px solid #dfe3ef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+        }
+
+        .radio-card:hover {
+            border-color: #8f82ff;
+            background: #fbfaff;
+            box-shadow: 0 10px 22px rgba(49, 28, 255, .08);
+        }
+
+        .radio-card input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .radio-card:has(input:checked) {
+            border-color: #3b25ff;
+            background: #fbfaff;
+            box-shadow: inset 0 0 0 1px rgba(59, 37, 255, .32);
+        }
+
+        .radio-icon {
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            width: 28px;
+            height: 28px;
+            color: #667099;
+        }
+
+        .radio-card:has(input:checked) .radio-icon {
+            color: #351dff;
+        }
+
+        .radio-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .radio-text {
+            display: grid;
+            gap: 7px;
+            min-width: 0;
+        }
+
+        .radio-name {
+            color: #141b42;
+            font-size: 16px;
+            font-weight: 900;
+        }
+
+        .radio-desc {
+            color: #6f7599;
+            font-size: 14px;
+            line-height: 1.35;
+        }
+
+        .radio-card:has(input:checked) .radio-name,
+        .radio-card:has(input:checked) .radio-desc {
+            color: #2f1cff;
+        }
+
+        .error-message {
+            display: none;
+            padding: 12px 14px;
+            border: 1px solid #ffc1d7;
+            border-radius: 8px;
+            color: #bd174e;
+            background: #fff1f6;
+            font-weight: 800;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .action-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 22px 28px;
+        }
+
+        .action-note {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: auto;
+            color: #74799b;
+            font-size: 14px;
+        }
+
+        .action-note svg {
+            width: 22px;
+            height: 22px;
+            color: #6570a8;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 58px;
+            padding: 0 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 900;
+            transition: color .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease;
+        }
+
+        .cancel-btn {
+            border: 1px solid #dfe3ef;
+            color: #151c42;
+            background: #fff;
+        }
+
+        .cancel-btn:hover {
+            border-color: #8f82ff;
+            color: #2f1cff;
+            background: #f7f5ff;
+            box-shadow: 0 10px 20px rgba(49, 28, 255, .08);
+            transform: translateY(-1px);
+        }
+
+        .delete-btn {
+            border: 1px solid #ffd1dc;
+            color: #bd174e;
+            background: #fff5f8;
+        }
+
+        .delete-btn:hover {
+            border-color: #ff8fb2;
+            color: #9f0f3f;
+            background: #ffeaf1;
+            box-shadow: 0 10px 20px rgba(189, 23, 78, .08);
+            transform: translateY(-1px);
+        }
+
+        .submit-btn {
+            min-width: 230px;
+            border: 0;
+            color: #fff;
+            background: linear-gradient(90deg, #331cff, #7d21d8);
+            box-shadow: 0 12px 26px rgba(51, 28, 255, .24);
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            background: linear-gradient(90deg, #2410d8, #6e19c8);
+            box-shadow: 0 16px 30px rgba(51, 28, 255, .32);
+            transform: translateY(-1px);
+        }
+
+        .submit-btn:disabled {
+            opacity: .65;
+            cursor: wait;
+        }
+
+        .btn svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        @media (max-width: 960px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero {
+                min-height: 280px;
+                padding: 56px 28px 42px;
+            }
+
+            .hero-planet {
+                right: -88px;
+                bottom: -72px;
+                width: min(480px, 76vw);
+                opacity: .55;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .option-grid,
+            .option-grid.three,
+            .number-inputs {
+                grid-template-columns: 1fr;
+            }
+
+            .action-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .action-note {
+                order: -1;
+                margin-left: 0;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="/css/sidebar.css">
+</head>
+<body>
+<div class="page">
+    <aside th:replace="~{fragments/sidebar :: sidebar('')}"></aside>
+
+    <main class="edit-page">
+        <section class="hero">
+            <div>
+                <h1 th:text="'Редактирование: ' + ${quizName}">Редактирование квиза</h1>
+                <p>Обновите название, количество вопросов и режим выбора. Сами вопросы и попытки останутся без изменений.</p>
+            </div>
+            <img class="hero-planet" src="/images/robot_with_laptop.png" alt="">
+        </section>
+
+        <section class="content">
+            <form id="editQuizForm" onsubmit="handleSubmit(event)">
+                <input type="hidden" id="quizId" th:value="${quizId}">
+                <input type="hidden" id="userId" th:value="${userId}">
+
+                <div class="form-grid">
+                    <section class="card">
+                        <h2 class="card-title">
+                            <i data-lucide="file-pen-line" aria-hidden="true"></i>
+                            <span>Основная информация</span>
+                        </h2>
+
+                        <div class="form-group">
+                            <label for="quizName">Название квиза</label>
+                            <input type="text"
+                                   id="quizName"
+                                   name="name"
+                                   th:value="${quizName}"
+                                   placeholder="Введите название квиза"
+                                   required
+                                   minlength="3"
+                                   maxlength="100">
+                        </div>
+
+                        <p class="field-note">Промпт, материал, видимость и тип вопросов после создания квиза не редактируются.</p>
+                    </section>
+
+                    <section class="card">
+                        <h2 class="card-title">
+                            <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+                            <span>Параметры квиза</span>
+                        </h2>
+
+                        <div class="number-inputs">
+                            <div>
+                                <label for="questionNumber">Количество вопросов</label>
+                                <div class="stepper">
+                                    <input type="number"
+                                           id="questionNumber"
+                                           name="questionNumber"
+                                           th:value="${quiz != null and quiz.questionNumber != null ? (quiz.questionNumber > maxQuestionNumber ? maxQuestionNumber : quiz.questionNumber) : maxQuestionNumber}"
+                                           min="1"
+                                           th:attr="max=${maxQuestionNumber}"
+                                           required>
+                                    <button type="button" onclick="stepNumber('questionNumber', -1)" aria-label="Уменьшить количество вопросов"><i data-lucide="minus"></i></button>
+                                    <button type="button" onclick="stepNumber('questionNumber', 1)" aria-label="Увеличить количество вопросов"><i data-lucide="plus"></i></button>
+                                </div>
+                                <p class="field-note" th:text="'Максимум ' + ${maxQuestionNumber} + ' вопросов'">Максимум 10 вопросов</p>
+                            </div>
+
+                            <div>
+                                <label for="timeLimit">Время на ответ (сек)</label>
+                                <div class="stepper">
+                                    <input type="number"
+                                           id="timeLimit"
+                                           name="timeLimit"
+                                           th:value="${timeLimit}"
+                                           min="1"
+                                           required>
+                                    <button type="button" onclick="stepNumber('timeLimit', -5)" aria-label="Уменьшить время"><i data-lucide="minus"></i></button>
+                                    <button type="button" onclick="stepNumber('timeLimit', 5)" aria-label="Увеличить время"><i data-lucide="plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="option-section">
+                            <span class="group-label">Набор вопросов</span>
+                            <div class="option-grid">
+                                <label class="radio-card">
+                                    <input type="radio"
+                                           id="static"
+                                           name="contentType"
+                                           value="static"
+                                           th:checked="${isStatic == true}">
+                                    <span class="radio-icon"><i data-lucide="file-text"></i></span>
+                                    <span class="radio-text">
+                                        <span class="radio-name">Фиксированный</span>
+                                        <span class="radio-desc">Один и тот же набор вопросов</span>
+                                    </span>
+                                </label>
+                                <label class="radio-card">
+                                    <input type="radio"
+                                           id="updatable"
+                                           name="contentType"
+                                           value="updatable"
+                                           th:checked="${isStatic == false}">
+                                    <span class="radio-icon"><i data-lucide="shuffle"></i></span>
+                                    <span class="radio-text">
+                                        <span class="radio-name">Случайный</span>
+                                        <span class="radio-desc">Случайные вопросы из базы</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="error-message" id="errorMessage"></div>
+
+                <div class="action-bar">
+                    <button type="button" class="btn cancel-btn" onclick="goBack()">
+                        <i data-lucide="arrow-left" aria-hidden="true"></i>
+                        <span>Отмена</span>
+                    </button>
+                    <button type="button" class="btn delete-btn" onclick="deleteQuiz()">
+                        <i data-lucide="trash-2" aria-hidden="true"></i>
+                        <span>Удалить квиз</span>
+                    </button>
+                    <div class="action-note">
+                        <i data-lucide="info" aria-hidden="true"></i>
+                        <span>Вопросы и прошлые попытки сохраняются без изменений</span>
+                    </div>
+                    <button type="submit" class="btn submit-btn" id="submitButton">
+                        <i data-lucide="save" aria-hidden="true"></i>
+                        <span>Сохранить изменения</span>
+                    </button>
+                </div>
+            </form>
+        </section>
+    </main>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    function refreshIcons() {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function goBack() {
+        window.location.href = '/my-quizzes';
+    }
+
+    function getCurrentUserId() {
+        const formUserId = document.getElementById('userId')?.value;
+        if (formUserId) return formUserId;
+
+        const storedUserId = localStorage.getItem('userId');
+        if (storedUserId) return storedUserId;
+
+        const urlUserId = new URLSearchParams(window.location.search).get('userId');
+        return urlUserId || '1';
+    }
+
+    function getQuizId() {
+        return document.getElementById('quizId').value;
+    }
+
+    function stepNumber(inputId, delta) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const min = input.min ? parseInt(input.min, 10) : -Infinity;
+        const max = input.max ? parseInt(input.max, 10) : Infinity;
+        const current = parseInt(input.value, 10) || 0;
+        input.value = String(Math.max(min, Math.min(max, current + delta)));
+    }
+
+    function showError(message) {
+        const errorMessage = document.getElementById('errorMessage');
+        errorMessage.textContent = message;
+        errorMessage.classList.add('show');
+    }
+
+    function clearError() {
+        document.getElementById('errorMessage').classList.remove('show');
+    }
+
+    async function handleSubmit(event) {
+        event.preventDefault();
+
+        const form = document.getElementById('editQuizForm');
+        const formData = new FormData(form);
+        const submitButton = document.getElementById('submitButton');
+        const token = localStorage.getItem('token');
+
+        clearError();
+        submitButton.disabled = true;
+
+        if (!token) {
+            showError('Вы не авторизованы.');
+            submitButton.disabled = false;
+            return;
+        }
+
+        const quizData = {
+            quizId: parseInt(getQuizId(), 10),
+            userId: parseInt(getCurrentUserId(), 10),
+            name: formData.get('name').trim(),
+            questionNumber: parseInt(formData.get('questionNumber'), 10),
+            timeLimit: parseInt(formData.get('timeLimit'), 10),
+            isStatic: formData.get('contentType') === 'static'
+        };
+
+        try {
+            const response = await fetch('/api/quizzes/' + getQuizId(), {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify(quizData)
+            });
+
+            if (!response.ok) {
+                let errorText = 'Ошибка';
+                try {
+                    const error = await response.text();
+                    try {
+                        const errorJson = JSON.parse(error);
+                        errorText = errorJson.message || errorJson.error || errorText;
+                    } catch (e) {
+                        errorText = error || errorText;
+                    }
+                } catch (e) {
+                    errorText = 'Ошибка: ' + response.status;
+                }
+
+                showError('Ошибка при обновлении квиза: ' + errorText);
+                return;
+            }
+
+            window.location.href = '/my-quizzes';
+        } catch (error) {
+            showError('Ошибка сети.');
+            console.error('Error:', error);
+        } finally {
+            submitButton.disabled = false;
+        }
+    }
+
+    async function deleteQuiz() {
+        if (!confirm('Вы уверены, что хотите удалить этот квиз? Это действие нельзя отменить.')) {
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showError('Вы не авторизованы.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/quizzes/' + getQuizId(), {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    quizId: parseInt(getQuizId(), 10),
+                    userId: parseInt(getCurrentUserId(), 10)
+                })
+            });
+
+            if (response.ok) {
+                window.location.href = '/my-quizzes';
+                return;
+            }
+
+            const error = await response.json().catch(function () {
+                return {};
+            });
+            showError('Ошибка при удалении квиза: ' + (error.message || error.error || response.statusText));
+        } catch (error) {
+            showError('Ошибка сети. Проверьте подключение к интернету.');
+            console.error('Error:', error);
+        }
+    }
+
+    refreshIcons();
+</script>
+</body>
+</html>

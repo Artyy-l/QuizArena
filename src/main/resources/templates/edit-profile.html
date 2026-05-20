@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование профиля - QuizArena</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            display: flex;
+        }
+
+        .sidebar {
+            display: none;
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+            margin-bottom: 15px;
+            text-align: center;
+            text-decoration: none;
+            display: block;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            margin-left: 0;
+            max-width: 100%;
+        }
+
+        .container {
+            max-width: none;
+            width: 100%;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            text-align: center;
+            margin: 0;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .current-value {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 35px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .cancel-btn {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .success-message {
+            color: #27ae60;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+.success-message.show {
+            display: block;
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                position: relative;
+                width: 100%;
+                margin-bottom: 20px;
+            }
+
+            .main-content {
+                margin-left: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <a href="#" onclick="goBack(); return false;" class="nav-btn">Назад</a>
+    <a href="/home" th:href="@{/home}" class="nav-btn">Главная</a>
+</div>
+
+<div class="main-content">
+    <div class="container">
+        <header class="header">
+            <h1>Редактирование профиля</h1>
+        </header>
+
+        <div class="form-container">
+            <form id="editProfileForm">
+                <div class="form-group">
+                    <label for="username">Новый логин</label>
+                    <input type="text"
+                           id="username"
+                           name="username"
+                           placeholder="Введите новый логин">
+                    <div class="current-value">
+                        Текущий логин: <span th:text="${userProfile != null ? userProfile.username : 'username'}">username</span>
+                    </div>
+                    <div class="error-message" id="usernameError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Новый пароль</label>
+                    <input type="password"
+                           id="password"
+                           name="password"
+                           placeholder="Введите новый пароль">
+                    <div class="error-message" id="passwordError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Подтверждение пароля</label>
+                    <input type="password"
+                           id="confirmPassword"
+                           name="confirmPassword"
+                           placeholder="Подтвердите новый пароль">
+                    <div class="error-message" id="confirmPasswordError"></div>
+                </div>
+
+                <div class="error-message" id="generalError"></div>
+                <div class="success-message" id="successMessage"></div>
+
+                <div class="button-group">
+                    <button type="button" class="cancel-btn" onclick="goBack()">
+                        Отмена
+                    </button>
+                    <button type="submit" class="submit-btn">
+                        Сохранить изменения
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    /**
+     * Возврат на страницу профиля.
+     * Получает userId из URL или localStorage.
+     */
+    function goBack() {
+        window.location.href = '/profile';
+    }
+
+    /**
+     * Получение ID текущего пользователя.
+     * Сначала проверяет query параметры, затем localStorage.
+     *
+     * @returns {string} ID пользователя
+     */
+    function getCurrentUserId() {
+        // Пробуем получить из URL параметров
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlUserId = urlParams.get('userId');
+        if (urlUserId) {
+            return urlUserId;
+        }
+
+        // Пробуем получить из localStorage
+        const storedUserId = localStorage.getItem('userId');
+        if (storedUserId) {
+            return storedUserId;
+        }
+
+        // Дефолтное значение
+        return '1';
+    }
+
+    // Обработчик отправки формы
+    document.getElementById('editProfileForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Скрываем предыдущие сообщения об ошибках
+        document.getElementById('usernameError').classList.remove('show');
+        document.getElementById('passwordError').classList.remove('show');
+        document.getElementById('confirmPasswordError').classList.remove('show');
+        document.getElementById('generalError').classList.remove('show');
+        document.getElementById('successMessage').classList.remove('show');
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        const userId = getCurrentUserId();
+
+        // Валидация
+        let hasErrors = false;
+
+        if (username && username.length < 3) {
+            document.getElementById('usernameError').textContent = 'Логин должен содержать минимум 3 символа';
+            document.getElementById('usernameError').classList.add('show');
+            hasErrors = true;
+        }
+
+        if (password && password.length < 6) {
+            document.getElementById('passwordError').textContent = 'Пароль должен содержать минимум 6 символов';
+            document.getElementById('passwordError').classList.add('show');
+            hasErrors = true;
+        }
+
+        if (password && password !== confirmPassword) {
+            document.getElementById('confirmPasswordError').textContent = 'Пароли не совпадают';
+            document.getElementById('confirmPasswordError').classList.add('show');
+            hasErrors = true;
+        }
+
+        if (hasErrors) {
+            return;
+        }
+
+        // Если ничего не заполнено
+        if (!username && !password) {
+            document.getElementById('generalError').textContent = 'Заполните хотя бы одно поле';
+            document.getElementById('generalError').classList.add('show');
+            return;
+        }
+
+        try {
+            const updateData = {
+                userId: parseInt(userId),
+                newUsername: username || null,
+                newPassword: password || null
+            };
+
+            const response = await fetch('/api/users/profile', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('successMessage').textContent = 'Профиль успешно обновлен';
+                document.getElementById('successMessage').classList.add('show');
+
+                // Очистка полей
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+                document.getElementById('confirmPassword').value = '';
+
+                // Обновление текущего логина на странице
+                if (data.username) {
+                    const currentUsernameSpan = document.querySelector('.current-value span');
+                    if (currentUsernameSpan) {
+                        currentUsernameSpan.textContent = data.username;
+                    }
+                }
+
+            } else {
+                const error = await response.json().catch(() => ({ message: 'Ошибка при обновлении профиля' }));
+                document.getElementById('generalError').textContent = error.message || 'Ошибка при обновлении профиля';
+                document.getElementById('generalError').classList.add('show');
+            }
+        } catch (error) {
+            document.getElementById('generalError').textContent = 'Ошибка сети';
+            document.getElementById('generalError').classList.add('show');
+            console.error('Error:', error);
+        }
+    });
+</script>
+</body>
+</html>

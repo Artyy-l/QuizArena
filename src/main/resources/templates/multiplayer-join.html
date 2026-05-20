@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Присоединение к сессии</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            padding: 32px;
+            color: #fff;
+            background:
+                radial-gradient(circle at 88% 16%, rgba(143, 69, 255, .26), transparent 18%),
+                radial-gradient(circle at 8% 72%, rgba(119, 62, 255, .22), transparent 24%),
+                linear-gradient(180deg, rgba(4, 3, 18, .2), rgba(4, 3, 18, .42)),
+                url('/images/space_for_game.png') center / cover fixed no-repeat;
+            font-family: Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            z-index: -1;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        body::before {
+            left: -120px;
+            bottom: -160px;
+            width: 420px;
+            height: 420px;
+            background: radial-gradient(circle at 40% 35%, rgba(144, 92, 255, .62), rgba(60, 24, 121, .44) 42%, transparent 68%);
+        }
+
+        body::after {
+            right: 72px;
+            top: 112px;
+            width: 170px;
+            height: 170px;
+            background: radial-gradient(circle at 42% 35%, rgba(182, 113, 255, .52), rgba(74, 31, 141, .38) 48%, transparent 70%);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 18px;
+            left: 36px;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 46px;
+            padding: 0 20px;
+            border: 1px solid rgba(179, 117, 255, .68);
+            border-radius: 12px;
+            color: #fff;
+            background: rgba(12, 8, 38, .45);
+            text-decoration: none;
+            font-weight: 800;
+            box-shadow: 0 12px 30px rgba(34, 18, 79, .22);
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+        }
+
+        .back-btn:hover {
+            border-color: #d98cff;
+            background: rgba(105, 54, 200, .3);
+        }
+
+        .back-btn svg {
+            width: 22px;
+            height: 22px;
+            color: #cfa9ff;
+            stroke-width: 2.6;
+        }
+
+        .join-shell {
+            display: grid;
+            place-items: center;
+            min-height: calc(100vh - 64px);
+        }
+
+        .join-card {
+            width: min(100%, 680px);
+            padding: 38px 42px 30px;
+            border: 1px solid rgba(179, 117, 255, .72);
+            border-radius: 24px;
+            color: #fff;
+            background:
+                radial-gradient(circle at 96% 100%, rgba(188, 55, 255, .26), transparent 32%),
+                linear-gradient(180deg, rgba(13, 12, 50, .76), rgba(9, 8, 34, .86));
+            box-shadow: 0 0 34px rgba(160, 82, 255, .28), inset 0 0 70px rgba(126, 86, 232, .14);
+            text-align: center;
+            backdrop-filter: blur(14px);
+        }
+
+        .mode-icon {
+            display: inline-grid;
+            place-items: center;
+            width: 74px;
+            height: 74px;
+            border: 2px solid rgba(179, 117, 255, .82);
+            border-radius: 50%;
+            color: #cfa9ff;
+            background: rgba(89, 55, 160, .28);
+            box-shadow: 0 0 24px rgba(177, 85, 255, .42);
+        }
+
+        .mode-icon svg {
+            width: 38px;
+            height: 38px;
+            stroke-width: 2.2;
+        }
+
+        h1 {
+            margin: 22px 0 12px;
+            color: #fff;
+            font-size: clamp(38px, 5vw, 58px);
+            font-weight: 900;
+            line-height: 1.05;
+            text-shadow: 0 8px 30px rgba(0, 0, 0, .42);
+        }
+
+        .subtitle {
+            max-width: 520px;
+            margin: 0 auto 28px;
+            color: #cdb7ff;
+            font-size: 20px;
+            line-height: 1.35;
+        }
+
+        .input-group {
+            margin-bottom: 18px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .input-group label svg {
+            width: 22px;
+            height: 22px;
+            color: #b477ff;
+        }
+
+        .input-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 62px;
+            padding: 0 18px;
+            border: 1px solid rgba(179, 117, 255, .62);
+            border-radius: 14px;
+            background: rgba(11, 10, 43, .48);
+            box-shadow: inset 0 0 24px rgba(156, 109, 255, .08);
+        }
+
+        .input-wrap svg {
+            flex: 0 0 auto;
+            width: 24px;
+            height: 24px;
+            color: #b477ff;
+        }
+
+        .input-group input {
+            width: 100%;
+            min-width: 0;
+            border: 0;
+            color: #fff;
+            background: transparent;
+            font-size: 18px;
+            outline: none;
+        }
+
+        .input-group input::placeholder {
+            color: rgba(205, 183, 255, .62);
+        }
+
+        .primary-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            width: 100%;
+            min-height: 70px;
+            border: 1px solid rgba(255, 158, 245, .52);
+            border-radius: 16px;
+            color: #fff;
+            background: linear-gradient(90deg, #4e7cff, #b934f2);
+            cursor: pointer;
+            font-size: 26px;
+            font-weight: 900;
+            box-shadow: 0 16px 40px rgba(116, 76, 255, .34), inset 0 0 18px rgba(255, 255, 255, .12);
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 20px 48px rgba(116, 76, 255, .42), inset 0 0 18px rgba(255, 255, 255, .12);
+        }
+
+        .primary-btn:disabled {
+            opacity: .62;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .primary-btn svg {
+            width: 28px;
+            height: 28px;
+            stroke-width: 2.4;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            min-height: 54px;
+            margin-top: 18px;
+            padding: 0 18px;
+            border: 1px solid rgba(155, 119, 230, .36);
+            border-radius: 14px;
+            color: #d8ccff;
+            background: rgba(11, 10, 43, .36);
+            font-size: 17px;
+        }
+
+        .status svg {
+            width: 22px;
+            height: 22px;
+            color: #b477ff;
+        }
+
+        .error-message {
+            display: none;
+            margin: 0 0 16px;
+            padding: 12px 14px;
+            border: 1px solid rgba(255, 108, 174, .42);
+            border-radius: 10px;
+            color: #ffd7e7;
+            background: rgba(117, 22, 66, .52);
+            font-weight: 800;
+            text-align: left;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                padding: 18px 14px 28px;
+            }
+
+            .back-btn {
+                position: static;
+                width: max-content;
+                margin-bottom: 22px;
+            }
+
+            .join-shell {
+                min-height: auto;
+            }
+
+            .join-card {
+                padding: 28px 16px 20px;
+                border-radius: 18px;
+            }
+
+            h1 {
+                font-size: 34px;
+            }
+
+            .subtitle {
+                font-size: 17px;
+            }
+
+            .primary-btn {
+                min-height: 64px;
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+<button class="back-btn" type="button" onclick="goBack()">
+    <i data-lucide="arrow-left" aria-hidden="true"></i>
+    <span>Назад</span>
+</button>
+
+<main class="join-shell">
+    <section class="join-card" aria-labelledby="joinTitle">
+        <div class="mode-icon">
+            <i data-lucide="users-round" aria-hidden="true"></i>
+        </div>
+        <h1 id="joinTitle">Присоединиться</h1>
+        <p class="subtitle">Введите ID сессии или используйте ссылку приглашения, чтобы попасть в лобби совместного квиза.</p>
+
+        <div class="input-group">
+            <label for="sessionIdInput">
+                <i data-lucide="link" aria-hidden="true"></i>
+                <span>ID сессии</span>
+            </label>
+            <div class="input-wrap">
+                <i data-lucide="hash" aria-hidden="true"></i>
+                <input type="text" id="sessionIdInput" placeholder="Введите ID сессии" th:value="${sessionId != null ? sessionId : ''}">
+            </div>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <button class="primary-btn" id="joinButton" onclick="joinSession()">
+            <i data-lucide="log-in" aria-hidden="true"></i>
+            <span>Присоединиться</span>
+        </button>
+
+        <div class="status" id="statusMessage">
+            <i data-lucide="clock" aria-hidden="true"></i>
+            <span>Введите ID сессии для присоединения</span>
+        </div>
+    </section>
+</main>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script th:inline="javascript">
+    const API_BASE = '/api/multiplayer';
+    let USER_ID = Number(/*[[${userId}]]*/ 0) || Number(localStorage.getItem('userId')) || null;
+
+    function refreshIcons() {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function setStatus(text, icon = 'clock') {
+        const statusEl = document.getElementById('statusMessage');
+        if (!statusEl) return;
+        statusEl.innerHTML = `<i data-lucide="${icon}" aria-hidden="true"></i><span>${text}</span>`;
+        refreshIcons();
+    }
+
+    function getSessionId() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('sessionId') || document.getElementById('sessionIdInput').value.trim();
+    }
+
+    async function joinSession() {
+        const sessionId = getSessionId();
+        const joinButton = document.getElementById('joinButton');
+
+        if (!sessionId) {
+            showError('Введите ID сессии');
+            return;
+        }
+
+        if (!USER_ID || USER_ID === 0) {
+            USER_ID = Number(localStorage.getItem('userId')) || null;
+            if (!USER_ID) {
+                showError('Необходимо войти в систему');
+                setTimeout(() => window.location.href = '/login', 2000);
+                return;
+            }
+        }
+
+        setStatus('Присоединение...', 'loader-circle');
+        joinButton.disabled = true;
+
+        try {
+            const response = await fetch(`${API_BASE}/sessions/join`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                },
+                body: JSON.stringify({
+                    sessionId: sessionId,
+                    userId: USER_ID
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                showError(error.message || `Ошибка ${response.status}`);
+                setStatus('Ошибка присоединения', 'circle-alert');
+                return;
+            }
+
+            const joined = await response.json();
+            if (joined) {
+                setStatus('Вы присоединились. Переходим в лобби...', 'check-circle');
+                setTimeout(() => {
+                    window.location.href = `/multiplayer/session/${sessionId}`;
+                }, 800);
+            } else {
+                showError('Не удалось присоединиться к сессии');
+                setStatus('Ошибка присоединения', 'circle-alert');
+            }
+        } catch (error) {
+            showError(error.message || 'Ошибка при присоединении');
+            setStatus('Ошибка присоединения', 'circle-alert');
+        } finally {
+            joinButton.disabled = false;
+        }
+    }
+
+    function showError(message) {
+        const errorEl = document.getElementById('errorMessage');
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+        setTimeout(() => {
+            errorEl.style.display = 'none';
+        }, 5000);
+    }
+
+    function goBack() {
+        window.location.href = '/home';
+    }
+
+    refreshIcons();
+
+    const sessionIdFromUrl = new URLSearchParams(window.location.search).get('sessionId');
+    if (sessionIdFromUrl) {
+        document.getElementById('sessionIdInput').value = sessionIdFromUrl;
+        joinSession();
+    }
+</script>
+</body>
+</html>

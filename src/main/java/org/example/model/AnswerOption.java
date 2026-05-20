@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "answer_options")
 @Getter
@@ -23,16 +25,15 @@ public class AnswerOption {
   @Column(name = "is_correct")
   private boolean isCorrect;
 
-  @Column(name = "is_na_option")
-  private boolean isNaOption;
+  @Column(name = "nominal", precision = 10, scale = 2)
+  private BigDecimal nominal;
 
   public AnswerOption() {}
 
-  public AnswerOption(Long id, Question question, String text, boolean isCorrect, boolean isNaOption) {
+  public AnswerOption(Long id, Question question, String text, boolean isCorrect) {
     this.id = id;
     this.question = question;
     this.text = text;
     this.isCorrect = isCorrect;
-    this.isNaOption = isNaOption;
   }
 }

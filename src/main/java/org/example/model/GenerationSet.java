@@ -3,13 +3,8 @@ package org.example.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.time.Instant;
 
-/**
- * Модель для хранения наборов сгенерированных вопросов.
- * Путь: src/main/java/org/example/model/GenerationSet.java
- */
 @Entity
 @Table(name = "generation_sets")
 @Getter
@@ -27,7 +22,16 @@ public class GenerationSet {
     private String prompt;
 
     @Column(name = "status", nullable = false, length = 20)
-    private String status; // "GENERATING", "VALIDATING", "DEDUPLICATING", "READY", "FAILED"
+    private String status;
+
+    @Column(name = "ml_job_id", length = 100)
+    private String mlJobId;
+
+    @Column(name = "failure_reason", length = 50)
+    private String failureReason;
+
+    @Column(name = "failure_message", columnDefinition = "TEXT")
+    private String failureMessage;
 
     @Column(name = "generated_count")
     private Integer generatedCount;
@@ -60,4 +64,3 @@ public class GenerationSet {
         this.createdAt = createdAt;
     }
 }
-

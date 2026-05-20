@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Таблица лидеров</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .main-content {
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            text-align: center;
+            margin: 0 0 10px 0;
+        }
+
+        .quiz-name {
+            text-align: center;
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .leaderboard-table thead {
+            background: #f8f9fa;
+        }
+
+        .leaderboard-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #e9ecef;
+            color: #333;
+        }
+
+        .leaderboard-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .leaderboard-table tbody tr {
+            transition: background 0.2s;
+        }
+
+        .leaderboard-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .rank {
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #667eea;
+            text-align: center;
+            width: 60px;
+            display: inline-block;
+        }
+
+        .rank.first {
+            color: #ffd700;
+        }
+
+        .rank.second {
+            color: #c0c0c0;
+        }
+
+        .rank.third {
+            color: #cd7f32;
+        }
+
+        .player-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .player-score {
+            color: #666;
+            font-weight: bold;
+        }
+
+        .player-time {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .user-row {
+            background: #f0f4ff;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+            flex-wrap: nowrap;
+            width: 100%;
+        }
+
+        .action-btn {
+            padding: 15px 40px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            flex: 0 1 auto;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .retry-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+
+        .home-btn {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        @media (max-width: 900px) {
+            .leaderboard-table {
+                font-size: 14px;
+            }
+
+            .leaderboard-table th,
+            .leaderboard-table td {
+                padding: 10px;
+            }
+
+            .action-btn {
+                padding: 12px 24px;
+                font-size: 15px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .button-group {
+                gap: 10px;
+            }
+
+            .action-btn {
+                padding: 10px 16px;
+                font-size: 14px;
+                min-width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="main-content">
+    <div class="container">
+        <input type="hidden" id="activeAttemptIdInput" th:value="${activeAttemptId}">
+
+        <header class="header">
+            <h1>Таблица лидеров</h1>
+            <div class="quiz-name" th:text="${quizName != null ? quizName : ''}">Название квиза</div>
+        </header>
+
+        <div class="content-section">
+            <table class="leaderboard-table" th:if="${leaderboard != null and leaderboard.entries() != null and !leaderboard.entries().isEmpty()}">
+                <thead>
+                <tr>
+                    <th>Место</th>
+                    <th>Игрок</th>
+                    <th>Результат</th>
+                    <th>Время</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="entry : ${leaderboard.entries()}"
+                    th:classappend="${userPosition != null and entry.position() != null and entry.position().equals(userPosition)} ? 'user-row' : ''">
+                    <td>
+                        <span class="rank"
+                              th:classappend="${entry.position() != null and entry.position() == 1} ? 'first' : (${entry.position() != null and entry.position() == 2} ? 'second' : (${entry.position() != null and entry.position() == 3} ? 'third' : ''))"
+                              th:text="${entry.position()}"></span>
+                    </td>
+                    <td class="player-name" th:text="${entry.username()}"></td>
+                    <td class="player-score" th:text="${entry.score()}"></td>
+                    <td class="player-time" th:text="${entry.timeSpent() != null ? entry.timeSpent() + ' сек' : '-'}"></td>
+                </tr>
+                </tbody>
+            </table>
+
+            <div class="empty-state" th:if="${leaderboard == null or leaderboard.entries() == null or leaderboard.entries().isEmpty()}">
+                <h3>Таблица лидеров пуста</h3>
+                <p>Этот квиз пока никто не проходил</p>
+            </div>
+
+            <div class="button-group">
+                <button class="action-btn retry-btn" onclick="startQuizAgain()">Пройти ещё раз</button>
+                <button class="action-btn home-btn" onclick="goHome()">На главную</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function getQuizId() {
+        const path = window.location.pathname;
+        const match = path.match(/\/quiz\/(\d+)/);
+        return match ? match[1] : null;
+    }
+
+    function goHome() {
+        window.location.href = '/home';
+    }
+
+    function startQuizAgain() {
+        const quizId = getQuizId();
+        const activeAttemptId = document.getElementById('activeAttemptIdInput')?.value;
+        const userId = localStorage.getItem('userId') || new URLSearchParams(window.location.search).get('userId');
+
+        if (!quizId || !userId) {
+            window.location.href = '/login';
+            return;
+        }
+
+        const userIdNum = parseInt(userId, 10);
+        if (isNaN(userIdNum) || userIdNum <= 0) {
+            localStorage.removeItem('userId');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+            return;
+        }
+
+        if (activeAttemptId) {
+            const shouldResume = confirm('У вас есть незавершённая попытка. Нажмите OK, чтобы продолжить, или Отмена, чтобы начать заново.');
+            if (shouldResume) {
+                window.location.href = '/quiz/' + quizId + '/attempt';
+                return;
+            }
+
+            const shouldRestart = confirm('Начать новую попытку? Прошлая незавершённая попытка будет завершена.');
+            if (!shouldRestart) {
+                return;
+            }
+
+            submitRestartAttempt(quizId);
+            return;
+        }
+
+        window.location.href = '/quiz/' + quizId + '/attempt';
+    }
+
+    function submitRestartAttempt(quizId) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/quiz/' + quizId + '/attempt/restart';
+        document.body.appendChild(form);
+        form.submit();
+    }
+</script>
+</body>
+</html>

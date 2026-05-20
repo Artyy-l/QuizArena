@@ -9,5 +9,8 @@ public record QuizResultDTO(
   Integer totalQuestions,
   Integer position,
   Long timeSpent,
-  LocalDateTime completedAt
+  LocalDateTime completedAt,
+  Integer catStake,
+  Integer catStakeBonus,
+  String mode
 ) {}

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль - QuizArena</title>
+    <style>
+        * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+          }
+
+          body {
+              font-family: 'Arial', sans-serif;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              min-height: 100vh;
+              color: #333;
+              display: flex;
+          }
+
+        .sidebar {
+            width: 250px;
+            background: white;
+            padding: 25px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+            height: 300px;
+            position: fixed;
+            left: 20px;
+            top: 20px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+          .profile-section {
+              margin-bottom: 30px;
+              flex: 1;
+          }
+
+        .profile-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+            transition: transform 0.2s;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+          .profile-btn:hover {
+              transform: translateY(-2px);
+          }
+
+        .nav-btn {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+            transition: all 0.3s;
+            margin-bottom: 15px;
+            text-align: center;
+            text-decoration: none;
+            display: block;
+        }
+
+          .nav-btn:hover {
+              background: #667eea;
+              color: white;
+          }
+
+        .nav-btn {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+            transition: all 0.3s;
+            margin-bottom: 15px;
+            text-align: center;
+            text-decoration: none;
+            display: block;
+        }
+
+          .nav-btn:hover {
+              background: #667eea;
+              color: white;
+          }
+
+          .main-content {
+              flex: 1;
+              padding: 20px;
+              margin-left: 340px;
+              max-width: calc(100vw - 360px);
+          }
+
+        .container {
+            max-width: none;
+            width: 100%;
+        }
+
+          .header {
+              background: white;
+              border-radius: 10px;
+              padding: 25px;
+              margin-bottom: 20px;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+              display: flex;
+              justify-content: center;
+              align-items: center;
+          }
+
+          .header h1 {
+              color: #333;
+              font-size: 2.5em;
+              text-align: center;
+              margin: 0;
+          }
+
+          .profile-section-main {
+              background: white;
+              border-radius: 10px;
+              padding: 40px;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+              width: 100%;
+              min-height: 500px;
+          }
+
+          .profile-menu {
+              list-style: none;
+              max-width: 500px;
+              margin: 0 auto;
+          }
+
+          .profile-menu-item {
+              background: #f8f9fa;
+              border: 2px solid #e9ecef;
+              border-radius: 15px;
+              padding: 25px 30px;
+              margin-bottom: 20px;
+              cursor: pointer;
+              transition: all 0.3s;
+              font-size: 20px;
+              color: #333;
+              text-align: center;
+          }
+  .profile-menu-item:hover {
+              background: #667eea;
+              color: white;
+              border-color: #667eea;
+              transform: translateX(10px);
+          }
+
+          .profile-menu-item:last-child {
+              margin-bottom: 0;
+          }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+            transition: all 0.3s;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+    <div class="profile-section">
+        <button class="profile-btn" onclick="goToProfile()">
+            <span>
+                Профиль: <span th:text="${userProfile != null ? userProfile.username : 'User'}">User</span>
+            </span>
+        </button>
+        <a th:href="@{/home}" class="nav-btn">Главная</a>
+        <button class="logout-btn" onclick="logout()">Выйти</button>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="container">
+        <header class="header">
+            <h1>Профиль</h1>
+        </header>
+
+        <section class="profile-section-main">
+            <ul class="profile-menu">
+                <li class="profile-menu-item" onclick="goToEditProfile()">
+                    Редактирование профиля
+                    <div style="font-size: 14px; margin-top: 8px; opacity: 0.8;" th:if="${userProfile != null}">
+                    </div>
+                </li>
+                <li class="profile-menu-item" onclick="goToHistory()">
+                    История
+                    <div style="font-size: 14px; margin-top: 8px; opacity: 0.8;" th:if="${userHistory != null and userHistory.attempts != null}">
+                    </div>
+                </li>
+                <li class="profile-menu-item" onclick="goToMyQuizzes()">
+                    Мои квизы
+                    <div style="font-size: 14px; margin-top: 8px; opacity: 0.8;" th:if="${createdQuizzes != null}">
+                    </div>
+                </li>
+            </ul>
+        </section>
+    </div>
+</div>
+
+<script>
+    function getCurrentUserId() {
+        // Сначала пробуем получить из URL параметров
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlUserId = urlParams.get('userId');
+        if (urlUserId) {
+            return urlUserId;
+        }
+        
+        // Если нет в URL, пробуем localStorage
+        const storedUserId = localStorage.getItem('userId');
+        if (storedUserId) {
+            return storedUserId;
+        }
+        
+        // Дефолтное значение
+        return '1';
+    }
+
+    function goToProfile() {
+        window.location.href = '/profile';
+    }
+
+    function goToMyQuizzes() {
+        if (getCurrentUserId()) {
+            window.location.href = '/my-quizzes';
+        } else {
+            window.location.href = '/login';
+        }
+    }
+
+    function goToEditProfile() {
+        const userId = getCurrentUserId();
+        if (userId) {
+            window.location.href = '/edit-profile';
+        } else {
+            window.location.href = '/login';
+        }
+    }
+
+    function goToHistory() {
+        if (getCurrentUserId()) {
+            window.location.href = '/history';
+        } else {
+            window.location.href = '/login';
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        window.location.href = '/login';
+    }
+
+</script>
+</body>
+</html>

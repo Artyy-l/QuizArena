@@ -16,14 +16,14 @@ public class User {
   @Column(nullable = false, unique = true)
   private String login;
 
-  @Column(nullable = false)
-  private String password;
+  @Column(name = "password_hash", nullable = false)
+  private String passwordHash;
 
   public User() {}
 
-  public User(Long id, String login, String password) {
+  public User(Long id, String login, String passwordHash) {
     this.id = id;
     this.login = login;
-    this.password = password;
+    this.passwordHash = passwordHash;
   }
 }

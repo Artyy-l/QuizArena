@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import org.example.model.QuestionType;
 
 @Entity
 @Table(name = "quizzes")
@@ -49,6 +50,10 @@ public class Quiz {
 
   @Column(name = "created_at")
   private Instant createdAt;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "default_question_type", length = 32)
+  private QuestionType defaultQuestionType;
 
   @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<Question> questions = new ArrayList<>();

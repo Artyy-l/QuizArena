@@ -3,12 +3,8 @@ package org.example.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.time.Instant;
 
-/**
- * Модель для хранения сессий совместного прохождения квизов.
- */
 @Entity
 @Table(name = "multiplayer_sessions")
 @Getter
@@ -19,7 +15,7 @@ public class MultiplayerSession {
     private Long id;
 
     @Column(name = "session_id", unique = true, nullable = false, length = 100)
-    private String sessionId; // UUID или уникальный идентификатор
+    private String sessionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quiz_id", nullable = false)
@@ -30,7 +26,7 @@ public class MultiplayerSession {
     private User hostUser;
 
     @Column(name = "status", nullable = false, length = 20)
-    private String status; // "WAITING", "STARTED", "FINISHED", "CANCELLED"
+    private String status;
 
     @Column(name = "created_at")
     private Instant createdAt;
@@ -41,10 +37,14 @@ public class MultiplayerSession {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    @Column(name = "cat_question_index")
+    private Integer catQuestionIndex;
+
     public MultiplayerSession() {}
 
-    public MultiplayerSession(Long id, String sessionId, Quiz quiz, User hostUser, 
-                             String status, Instant createdAt, Instant startedAt, Instant finishedAt) {
+    public MultiplayerSession(Long id, String sessionId, Quiz quiz, User hostUser,
+                             String status, Instant createdAt, Instant startedAt, Instant finishedAt,
+                             Integer catQuestionIndex) {
         this.id = id;
         this.sessionId = sessionId;
         this.quiz = quiz;
@@ -53,6 +53,6 @@ public class MultiplayerSession {
         this.createdAt = createdAt;
         this.startedAt = startedAt;
         this.finishedAt = finishedAt;
+        this.catQuestionIndex = catQuestionIndex;
     }
 }
-

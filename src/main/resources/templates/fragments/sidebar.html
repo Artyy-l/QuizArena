@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<body>
+<aside class="sidebar" th:fragment="sidebar(activePage)">
+    <a class="brand" href="/home" aria-label="QuizArena">
+        <span class="brand-mark"><i class="brand-mark-icon" data-lucide="zap" aria-hidden="true"></i></span>
+        <span>Quiz<span>Arena</span></span>
+    </a>
+
+    <div class="profile">
+        <a class="profile-card" href="/profile" aria-label="Профиль" data-tooltip="Профиль">
+            <span class="profile-main">
+                <span class="profile-avatar"
+                      th:text="${currentUsername != null and !#strings.isEmpty(currentUsername) ? #strings.substring(currentUsername, 0, 1) : 'Q'}">Q</span>
+                <span class="profile-text">
+                    <span class="profile-name" th:text="${currentUsername != null ? currentUsername : 'Профиль'}">Профиль</span>
+                    <span class="profile-subtitle">Открыть</span>
+                </span>
+            </span>
+            <i class="profile-link-icon" data-lucide="chevron-right" aria-hidden="true"></i>
+        </a>
+    </div>
+
+    <nav class="nav" aria-label="Основная навигация">
+        <a href="/home" aria-label="Главная" data-tooltip="Главная" th:classappend="${activePage == 'home'} ? ' active' : ''">
+            <i class="nav-icon" data-lucide="house" aria-hidden="true"></i>
+            <span class="nav-label">Главная</span>
+        </a>
+        <a href="/my-quizzes" aria-label="Мои квизы" data-tooltip="Мои квизы" th:classappend="${activePage == 'my-quizzes'} ? ' active' : ''">
+            <i class="nav-icon" data-lucide="library" aria-hidden="true"></i>
+            <span class="nav-label">Мои квизы</span>
+        </a>
+        <a href="/history" aria-label="История" data-tooltip="История" th:classappend="${activePage == 'history'} ? ' active' : ''">
+            <i class="nav-icon" data-lucide="clock-3" aria-hidden="true"></i>
+            <span class="nav-label">История</span>
+        </a>
+        <span class="nav-divider"></span>
+        <a href="/profile" aria-label="Настройки" data-tooltip="Настройки" th:classappend="${activePage == 'profile'} ? ' active' : ''">
+            <i class="nav-icon" data-lucide="settings" aria-hidden="true"></i>
+            <span class="nav-label">Настройки</span>
+        </a>
+        <a href="/login" aria-label="Выйти" data-tooltip="Выйти">
+            <i class="nav-icon" data-lucide="log-out" aria-hidden="true"></i>
+            <span class="nav-label">Выйти</span>
+        </a>
+    </nav>
+
+    <section class="ai-card">
+        <img src="/images/robot.png" alt="">
+        <div class="ai-card-content">
+            <div class="ai-title">Создайте квиз с ИИ</div>
+            <p>Укажите тему или загрузите материалы, а мы соберем квиз за пару минут.</p>
+            <a class="ai-button" href="/quiz/create" aria-label="Создать квиз с ИИ" data-tooltip="Создать квиз с ИИ">
+                <i class="ai-button-icon" data-lucide="plus" aria-hidden="true"></i>
+                <span class="ai-button-label">Создать квиз</span>
+            </a>
+        </div>
+    </section>
+</aside>
+</body>
+</html>
