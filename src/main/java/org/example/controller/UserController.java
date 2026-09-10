@@ -1,10 +1,12 @@
 package org.example.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.example.dto.request.auth.UpdateProfileRequest;
 import org.example.dto.response.auth.UserProfileDTO;
 import org.example.dto.response.history.UserHistoryDTO;
 import org.example.dto.response.quiz.QuizDTO;
 import org.example.service.UserService;
+import org.example.security.RequestAuthorization;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,14 +18,17 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final RequestAuthorization authorization;
 
     @Autowired
-    public UserController(UserService userService) {
+    public UserController(UserService userService, RequestAuthorization authorization) {
         this.userService = userService;
+        this.authorization = authorization;
     }
 
     @GetMapping("/{userId}/profile")
-    public ResponseEntity<?> getUserProfile(@PathVariable Long userId) {
+    public ResponseEntity<?> getUserProfile(@PathVariable Long userId, HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, userId);
         try {
             if (userId == null || userId <= 0) {
                 return ResponseEntity.badRequest().body("Некорректный ID пользователя");
@@ -40,7 +45,9 @@ public class UserController {
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<?> updateUserProfile(@RequestBody UpdateProfileRequest request) {
+    public ResponseEntity<?> updateUserProfile(@RequestBody UpdateProfileRequest request,
+                                               HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, request.userId());
         try {
             if (request.userId() == null) {
                 return ResponseEntity.badRequest().body("ID пользователя обязателен");
@@ -57,7 +64,8 @@ public class UserController {
     }
 
     @GetMapping("/{userId}/history")
-    public ResponseEntity<?> getUserHistory(@PathVariable Long userId) {
+    public ResponseEntity<?> getUserHistory(@PathVariable Long userId, HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, userId);
         try {
             if (userId == null || userId <= 0) {
                 return ResponseEntity.badRequest().body("Некорректный ID пользователя");
@@ -74,7 +82,8 @@ public class UserController {
     }
 
     @GetMapping("/{userId}/quizzes")
-    public ResponseEntity<?> getCreatedQuizzes(@PathVariable Long userId) {
+    public ResponseEntity<?> getCreatedQuizzes(@PathVariable Long userId, HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, userId);
         try {
             if (userId == null || userId <= 0) {
                 return ResponseEntity.badRequest().body("Некорректный ID пользователя");

@@ -74,18 +74,8 @@ public class AttemptService {
     }
 
     private static class AttemptState {
-        Long attemptId;
-        Long userId;
-        Long quizId;
-        List<Long> questionIds;
-        int currentQuestionIndex;
-        Map<Long, Long> answers;
-        Map<Long, Boolean> answerResults;
-        Instant startTime;
         double score;
         double baseScore;
-
-        Map<Long, Map<Long, BigDecimal>> hundredToOneNominalsByQuestionId;
 
         Integer catQuestionIndex;
         Integer stakeForCurrentQuestion;
@@ -180,10 +170,6 @@ public class AttemptService {
         AttemptState existingState = attemptStates.get(attempt.getId());
         if (existingState == null) {
             AttemptState st = new AttemptState();
-            st.attemptId = attempt.getId();
-            st.userId = request.userId();
-            st.quizId = quiz.getId();
-            st.hundredToOneNominalsByQuestionId = new ConcurrentHashMap<>();
             st.score = attempt.getScore() != null ? attempt.getScore() : 0.0;
             st.baseScore = getEffectiveBaseScore(attempt);
             st.catQuestionIndex = resolvedCatQuestionIndex;
@@ -214,6 +200,81 @@ public class AttemptService {
                 toEpochMillis(attempt.getCurrentQuestionDeadlineAt())
         );
     }
+
+    public void prepareMultiplayerSessionQuestions(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("SessionId не может быть пустым");
+        }
+
+        MultiplayerSession session = multiplayerSessionRepository.findBySessionId(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Сессия не найдена"));
+        List<UserQuizAttempt> sessionAttempts = attemptRepository.findBySessionId(sessionId).stream()
+                .filter(attempt -> attempt != null && !attempt.isCompleted())
+                .sorted((left, right) -> Long.compare(left.getId(), right.getId()))
+                .collect(Collectors.toList());
+        if (sessionAttempts.isEmpty()) {
+            throw new IllegalStateException("В сессии нет участников");
+        }
+
+        UserQuizAttempt sourceAttempt = sessionAttempts.get(0);
+        List<AttemptQuestion> sourceAttemptQuestions =
+                attemptQuestionRepository.findByAttemptIdOrderByQuestionOrder(sourceAttempt.getId());
+        if (sourceAttemptQuestions.isEmpty()) {
+            Quiz quiz = session.getQuiz();
+            List<Question> allQuestions = questionRepository.findByQuizId(quiz.getId());
+            if (allQuestions.isEmpty()) {
+                throw new IllegalStateException("Квиз не содержит вопросов");
+            }
+            selectQuestionsForAttempt(sourceAttempt, quiz, allQuestions);
+            sourceAttemptQuestions = attemptQuestionRepository
+                    .findByAttemptIdOrderByQuestionOrder(sourceAttempt.getId());
+        }
+
+        List<Question> selectedQuestions = sourceAttemptQuestions.stream()
+                .sorted((left, right) -> Integer.compare(left.getQuestionOrder(), right.getQuestionOrder()))
+                .map(AttemptQuestion::getQuestion)
+                .filter(question -> question != null)
+                .collect(Collectors.toList());
+        if (selectedQuestions.isEmpty()) {
+            throw new IllegalStateException("Не удалось выбрать вопросы для сессии");
+        }
+
+        for (UserQuizAttempt attempt : sessionAttempts) {
+            List<AttemptQuestion> existing = attemptQuestionRepository
+                    .findByAttemptIdOrderByQuestionOrder(attempt.getId());
+            boolean hasSameQuestions = existing.size() == selectedQuestions.size();
+            if (hasSameQuestions) {
+                for (int i = 0; i < selectedQuestions.size(); i++) {
+                    Question existingQuestion = existing.get(i).getQuestion();
+                    if (existingQuestion == null
+                            || !existingQuestion.getId().equals(selectedQuestions.get(i).getId())) {
+                        hasSameQuestions = false;
+                        break;
+                    }
+                }
+            }
+            if (hasSameQuestions) {
+                continue;
+            }
+
+            if (!userAnswerRepository.findByAttemptId(attempt.getId()).isEmpty()) {
+                throw new IllegalStateException("Нельзя изменить вопросы уже начатой попытки");
+            }
+            attemptQuestionRepository.deleteAll(existing);
+            for (int i = 0; i < selectedQuestions.size(); i++) {
+                attemptQuestionRepository.save(new AttemptQuestion(attempt, selectedQuestions.get(i), i));
+            }
+        }
+
+        if (session.getCatQuestionIndex() == null) {
+            int totalQuestions = selectedQuestions.size();
+            int lastSegmentStart = Math.max(0, totalQuestions - Math.max(1, totalQuestions / 3));
+            int catIndex = lastSegmentStart + new Random().nextInt(totalQuestions - lastSegmentStart);
+            session.setCatQuestionIndex(catIndex);
+            multiplayerSessionRepository.save(session);
+        }
+    }
+
     public QuestionDTO getNextQuestion(Long attemptId) {
         return getNextQuestionInternal(attemptId, true);
     }
@@ -289,6 +350,8 @@ public class AttemptService {
         org.example.model.AnswerOption selectedOption = null;
 
         List<org.example.model.AnswerOption> allOptions = answerOptionRepository.findByQuestionId(questionId);
+        Map<Long, BigDecimal> hundredToOneNominals = question.getType() == QuestionType.HUNDRED_TO_ONE
+                ? resolveHundredToOneNominals(allOptions) : Map.of();
         java.util.Set<Long> correctIds = allOptions.stream()
                 .filter(org.example.model.AnswerOption::isCorrect)
                 .map(org.example.model.AnswerOption::getId)
@@ -302,20 +365,21 @@ public class AttemptService {
                 int a = (int) selectedIds.stream().filter(correctIds::contains).count();
                 int b = (int) selectedIds.stream().filter(id -> !correctIds.contains(id)).count();
                 int c = correctIds.size();
-                double points = c > 0 ? 2.0 * Math.max(a - b, 0) / c : 0;
                 questionAccuracyRatio = c > 0 ? (double) Math.max(a - b, 0) / c : 0.0;
-                scoreEarned = (int) Math.round(points);
-                scoreEarnedDouble = points;
                 java.util.Set<Long> selectedIdSet = new java.util.HashSet<>(selectedIds);
                 isCorrect = selectedIdSet.equals(correctIds);
+                // Частично верный ответ влияет на точность, но не приносит баллов.
+                // За вопрос с несколькими вариантами балл начисляется только при
+                // выборе всех верных вариантов и отсутствии неверных.
+                scoreEarned = calculateMultipleChoiceScore(selectedIds, correctIds);
+                scoreEarnedDouble = scoreEarned;
             } else if (question.getType() == QuestionType.HUNDRED_TO_ONE) {
-                java.util.Map<Long, BigDecimal> nominals = ensureHundredToOneNominals(request.attemptId(), question);
                 BigDecimal sum = BigDecimal.ZERO;
                 for (Long selectedId : selectedIds) {
                     if (selectedId == null) {
                         continue;
                     }
-                    BigDecimal nominal = nominals.get(selectedId);
+                    BigDecimal nominal = hundredToOneNominals.get(selectedId);
                     if (nominal != null) {
                         sum = sum.add(nominal);
                     }
@@ -400,7 +464,8 @@ public class AttemptService {
                 correctAnswerIds,
                 scoreEarned,
                 nextQuestion,
-                attempt.getQuiz().getId()
+                attempt.getQuiz().getId(),
+                hundredToOneNominals
         );
     }
     private QuestionDTO peekNextQuestion(Long attemptId) {
@@ -477,6 +542,11 @@ public class AttemptService {
             return;
         }
 
+        if (question.getId().equals(attempt.getCurrentQuestionId())
+                && attempt.getCurrentQuestionDeadlineAt() != null) {
+            return;
+        }
+
         attempt.setCurrentQuestionId(question.getId());
         attempt.setCurrentQuestionStartedAt(Instant.now());
         int seconds = getDefaultTimePerQuestionSeconds(attempt.getQuiz());
@@ -496,11 +566,12 @@ public class AttemptService {
         attemptRepository.save(attempt);
     }
 
-    private boolean isTimedOut(UserQuizAttempt attempt, Long questionId, Instant now) {
+    static boolean isTimedOut(UserQuizAttempt attempt, Long questionId, Instant now) {
         return questionId != null
                 && questionId.equals(attempt.getCurrentQuestionId())
                 && attempt.getCurrentQuestionDeadlineAt() != null
-                && now.isAfter(attempt.getCurrentQuestionDeadlineAt());
+                // Допускаем небольшую задержку передачи ответа, автоматически отправленного по таймеру.
+                && now.isAfter(attempt.getCurrentQuestionDeadlineAt().plusSeconds(5));
     }
 
     private Integer getRemainingSeconds(UserQuizAttempt attempt, QuestionDTO currentQuestion) {
@@ -538,7 +609,15 @@ public class AttemptService {
         if (attempt.isCompleted()) {
             List<AttemptQuestion> attemptQuestions = attemptQuestionRepository.findByAttemptIdOrderByQuestionOrder(attemptId);
             int totalQuestions = attemptQuestions.size();
+            List<UserAnswer> answers = userAnswerRepository.findByAttemptId(attemptId);
             int correctAnswers = (int) userAnswerRepository.countByAttemptIdAndIsCorrectTrue(attemptId);
+            int accuracyPercent = attempt.getAccuracyPercent() != null
+                    ? attempt.getAccuracyPercent()
+                    : calculateAccuracyPercent(answers, totalQuestions);
+            if (attempt.getAccuracyPercent() == null) {
+                attempt.setAccuracyPercent(accuracyPercent);
+                attemptRepository.save(attempt);
+            }
             int finalScore = attempt.getScore() != null ? attempt.getScore().intValue() : 0;
 
             long timeSpent = 0;
@@ -547,6 +626,18 @@ public class AttemptService {
             }
 
             String mode = getAttemptMode(attempt);
+            if ("multiplayer".equals(mode)) {
+                leaderboardService.updateLeaderboard(
+                        attempt.getQuiz().getId(),
+                        attempt.getUser().getId(),
+                        attempt.getUser().getLogin(),
+                        getEffectiveBaseScore(attempt),
+                        timeSpent,
+                        accuracyPercent,
+                        getCompletedAttemptNumber(attempt),
+                        "solo"
+                );
+            }
             int position = calculatePosition(attempt.getQuiz().getId(), attempt.getUser().getId(), finalScore, timeSpent, mode);
             return new QuizResultDTO(
                     attemptId,
@@ -558,7 +649,8 @@ public class AttemptService {
                     toLocalDateTime(attempt.getFinishTime()),
                     attempt.getCatStake(),
                     attempt.getCatStakeBonus(),
-                    mode
+                    mode,
+                    accuracyPercent
             );
         }
 
@@ -601,22 +693,34 @@ public class AttemptService {
         int attemptNumber = getCompletedAttemptNumber(attempt);
 
         String mode = getAttemptMode(attempt);
-        leaderboardService.updateLeaderboard(
-                attempt.getQuiz().getId(),
-                attempt.getUser().getId(),
-                attempt.getUser().getLogin(),
-                leaderboardScore,
-                timeSpent,
-                accuracyPercent,
-                attemptNumber,
-                "solo"
-        );
         if ("multiplayer".equals(mode)) {
             leaderboardService.updateLeaderboard(
                     attempt.getQuiz().getId(),
                     attempt.getUser().getId(),
                     attempt.getUser().getLogin(),
                     finalScore,
+                    timeSpent,
+                    accuracyPercent,
+                    attemptNumber,
+                    mode
+            );
+            // В общем рейтинге учитываются обычные баллы без бонуса ставки в мультиплеере.
+            leaderboardService.updateLeaderboard(
+                    attempt.getQuiz().getId(),
+                    attempt.getUser().getId(),
+                    attempt.getUser().getLogin(),
+                    leaderboardScore,
+                    timeSpent,
+                    accuracyPercent,
+                    attemptNumber,
+                    "solo"
+            );
+        } else {
+            leaderboardService.updateLeaderboard(
+                    attempt.getQuiz().getId(),
+                    attempt.getUser().getId(),
+                    attempt.getUser().getLogin(),
+                    leaderboardScore,
                     timeSpent,
                     accuracyPercent,
                     attemptNumber,
@@ -643,7 +747,8 @@ public class AttemptService {
                 toLocalDateTime(attempt.getFinishTime()),
                 attempt.getCatStake(),
                 attempt.getCatStakeBonus(),
-                mode
+                mode,
+                accuracyPercent
         );
     }
 
@@ -768,7 +873,7 @@ public class AttemptService {
 
         java.util.Map<Long, BigDecimal> hundredToOneNominalsByOptionId = null;
         if (question.getType() == QuestionType.HUNDRED_TO_ONE) {
-            hundredToOneNominalsByOptionId = ensureHundredToOneNominals(attemptId, question);
+            hundredToOneNominalsByOptionId = getHundredToOneNominals(question);
         }
             
         List<org.example.model.AnswerOption> options = answerOptionRepository.findByQuestionId(question.getId());
@@ -777,11 +882,12 @@ public class AttemptService {
             throw new IllegalStateException("У вопроса ID " + question.getId() + " нет вариантов ответов");
         }
 
-        if (question.getType() == QuestionType.HUNDRED_TO_ONE) {
-            long shuffleSeed = attemptId * 1000003L + (question.getId() != null ? question.getId() : 0L);
-            options = new ArrayList<>(options);
-            Collections.shuffle(options, new Random(shuffleSeed));
-        }
+        // Сервис генерации часто ставит верный вариант первым. Перемешиваем
+        // варианты для каждой попытки, сохраняя порядок неизменным на время
+        // прохождения, чтобы позиция не выдавала ответ.
+        long shuffleSeed = attemptId * 1000003L + (question.getId() != null ? question.getId() : 0L);
+        options = new ArrayList<>(options);
+        Collections.shuffle(options, new Random(shuffleSeed));
 
         List<AnswerOption> dtoOptions = new ArrayList<>();
         for (org.example.model.AnswerOption opt : options) {
@@ -833,78 +939,38 @@ public class AttemptService {
                     .orElseThrow(() -> new IllegalArgumentException("Попытка не найдена"));
 
             st = new AttemptState();
-            st.attemptId = attemptId;
-            st.userId = attempt.getUser() != null ? attempt.getUser().getId() : null;
-            st.quizId = attempt.getQuiz() != null ? attempt.getQuiz().getId() : null;
             st.score = attempt.getScore() != null ? attempt.getScore().doubleValue() : 0.0;
             st.baseScore = getEffectiveBaseScore(attempt);
             st.stakeForCurrentQuestion = attempt.getCatStakeBonus() == null ? attempt.getCatStake() : null;
-            st.hundredToOneNominalsByQuestionId = new ConcurrentHashMap<>();
             attemptStates.put(attemptId, st);
         }
 
-        if (st.hundredToOneNominalsByQuestionId == null) {
-            st.hundredToOneNominalsByQuestionId = new ConcurrentHashMap<>();
-        }
         return st;
     }
 
-    private java.util.Map<Long, BigDecimal> ensureHundredToOneNominals(Long attemptId, Question question) {
-        AttemptState st = getOrCreateAttemptState(attemptId);
-
-        java.util.Map<Long, BigDecimal> existing = st.hundredToOneNominalsByQuestionId.get(question.getId());
-        if (existing != null) {
-            return existing;
-        }
-
+    private java.util.Map<Long, BigDecimal> getHundredToOneNominals(Question question) {
         List<org.example.model.AnswerOption> options = answerOptionRepository.findByQuestionId(question.getId());
         if (options == null || options.isEmpty()) {
             throw new IllegalStateException("У вопроса ID " + question.getId() + " нет вариантов ответов");
         }
 
-        java.util.List<Long> correctIds = options.stream()
-                .filter(org.example.model.AnswerOption::isCorrect)
-                .map(org.example.model.AnswerOption::getId)
-                .toList();
-        java.util.List<Long> incorrectIds = options.stream()
-                .filter(o -> !o.isCorrect())
-                .map(org.example.model.AnswerOption::getId)
-                .toList();
+        return resolveHundredToOneNominals(options);
+    }
 
-        java.util.List<BigDecimal> correctPool = new java.util.ArrayList<>(
-                java.util.List.of(
-                        new BigDecimal("1"),
-                        new BigDecimal("1.5"),
-                        new BigDecimal("2"),
-                        new BigDecimal("2.5"),
-                        new BigDecimal("3")
-                )
-        );
-        java.util.List<BigDecimal> incorrectPool = new java.util.ArrayList<>(
-                java.util.List.of(
-                        new BigDecimal("0"),
-                        new BigDecimal("-1"),
-                        new BigDecimal("-2")
-                )
-        );
-
-        long seed = attemptId * 1000003L + (question.getId() != null ? question.getId() : 0L);
-        Random rnd = new Random(seed);
-        Collections.shuffle(correctPool, rnd);
-        Collections.shuffle(incorrectPool, rnd);
-
+    static java.util.Map<Long, BigDecimal> resolveHundredToOneNominals(List<org.example.model.AnswerOption> options) {
         java.util.Map<Long, BigDecimal> mapping = new java.util.HashMap<>();
-
-        for (int i = 0; i < correctIds.size(); i++) {
-            BigDecimal nominal = correctPool.get(i % correctPool.size());
-            mapping.put(correctIds.get(i), nominal);
+        int legacyCorrectIndex = 0;
+        for (org.example.model.AnswerOption option : options) {
+            BigDecimal nominal = option.getNominal();
+            if (nominal == null) {
+                // У вопросов, созданных до появления AI-оценки, номинал не сохранён.
+                // Используем постоянное прежнее значение, а не случайное для каждой попытки.
+                nominal = option.isCorrect()
+                        ? BigDecimal.valueOf(Math.max(1, 5 - legacyCorrectIndex++))
+                        : BigDecimal.ZERO;
+            }
+            mapping.put(option.getId(), nominal);
         }
-        for (int i = 0; i < incorrectIds.size(); i++) {
-            BigDecimal nominal = incorrectPool.get(i % incorrectPool.size());
-            mapping.put(incorrectIds.get(i), nominal);
-        }
-
-        st.hundredToOneNominalsByQuestionId.put(question.getId(), mapping);
         return mapping;
     }
 
@@ -924,6 +990,10 @@ public class AttemptService {
         return 1;
     }
 
+    static int calculateMultipleChoiceScore(List<Long> selectedIds, java.util.Set<Long> correctIds) {
+        return new java.util.HashSet<>(selectedIds).equals(correctIds) ? 1 : 0;
+    }
+
     private String getAttemptMode(UserQuizAttempt attempt) {
         return attempt != null && attempt.getSessionId() != null && !attempt.getSessionId().isBlank()
                 ? "multiplayer"
@@ -934,6 +1004,8 @@ public class AttemptService {
         if (totalQuestions <= 0) {
             return 0;
         }
+        // Вопросы с несколькими вариантами дают частичный балл. Используем ту же
+        // долю по каждому вопросу, что и в рейтинге, а не только точные ответы.
         double accuracySum = answers.stream()
                 .mapToDouble(answer -> {
                     if (answer.getAccuracyRatio() != null) {
@@ -943,6 +1015,19 @@ public class AttemptService {
                 })
                 .sum();
         return (int) Math.round(accuracySum * 100.0 / totalQuestions);
+    }
+
+    private int getAttemptAccuracyPercent(UserQuizAttempt attempt) {
+        if (attempt == null) {
+            return 0;
+        }
+        if (attempt.getAccuracyPercent() != null) {
+            return attempt.getAccuracyPercent();
+        }
+        int totalQuestions = attemptQuestionRepository
+                .findByAttemptIdOrderByQuestionOrder(attempt.getId())
+                .size();
+        return calculateAccuracyPercent(userAnswerRepository.findByAttemptId(attempt.getId()), totalQuestions);
     }
 
     private int getCompletedAttemptNumber(UserQuizAttempt attempt) {
@@ -972,7 +1057,7 @@ public class AttemptService {
         Pageable pageable = PageRequest.of(0, 10000);
         Page<UserQuizAttempt> allAttempts = "multiplayer".equalsIgnoreCase(mode)
                 ? attemptRepository.findCompletedMultiplayerByQuizIdOrderByScoreDesc(quizId, pageable)
-                : attemptRepository.findCompletedByQuizId(quizId, pageable);
+                : attemptRepository.findCompletedSoloByQuizIdOrderByScoreDesc(quizId, pageable);
 
         Map<Long, UserQuizAttempt> bestAttemptsByUser = new java.util.HashMap<>();
         
@@ -993,8 +1078,8 @@ public class AttemptService {
                 if (currentScore > bestScore) {
                     bestAttemptsByUser.put(userId, attempt);
                 } else if (currentScore.equals(bestScore)) {
-                    int bestAccuracy = bestAttempt.getAccuracyPercent() != null ? bestAttempt.getAccuracyPercent() : 0;
-                    int currentAccuracy = attempt.getAccuracyPercent() != null ? attempt.getAccuracyPercent() : 0;
+                    int bestAccuracy = getAttemptAccuracyPercent(bestAttempt);
+                    int currentAccuracy = getAttemptAccuracyPercent(attempt);
                     if (currentAccuracy > bestAccuracy) {
                         bestAttemptsByUser.put(userId, attempt);
                         continue;
@@ -1045,8 +1130,8 @@ public class AttemptService {
                 return scoreCompare;
             }
 
-            int accuracyA = a.getAccuracyPercent() != null ? a.getAccuracyPercent() : 0;
-            int accuracyB = b.getAccuracyPercent() != null ? b.getAccuracyPercent() : 0;
+            int accuracyA = getAttemptAccuracyPercent(a);
+            int accuracyB = getAttemptAccuracyPercent(b);
             int accuracyCompare = Integer.compare(accuracyB, accuracyA);
             if (accuracyCompare != 0) {
                 return accuracyCompare;
@@ -1105,11 +1190,18 @@ public class AttemptService {
                 return scoreCompare;
             }
             int accuracyCompare = Integer.compare(
-                    b.getAccuracyPercent() != null ? b.getAccuracyPercent() : 0,
-                    a.getAccuracyPercent() != null ? a.getAccuracyPercent() : 0
+                    getAttemptAccuracyPercent(b),
+                    getAttemptAccuracyPercent(a)
             );
             if (accuracyCompare != 0) {
                 return accuracyCompare;
+            }
+            int attemptNumberCompare = Integer.compare(
+                    getCompletedAttemptNumber(a),
+                    getCompletedAttemptNumber(b)
+            );
+            if (attemptNumberCompare != 0) {
+                return attemptNumberCompare;
             }
             return Long.compare(getTimeSpentSeconds(a), getTimeSpentSeconds(b));
         });

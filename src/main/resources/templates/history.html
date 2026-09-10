@@ -693,6 +693,9 @@
         }
     </style>
     <link rel="stylesheet" href="/css/sidebar.css">
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <div class="page">
@@ -775,7 +778,7 @@
                      th:text="${card.bestAccuracy} + '%'">92%</div>
 
                 <div class="best-score">
-                    <strong><span th:text="${card.bestScore}">46</span><span> / </span><span th:text="${card.questionCount}">50</span></strong>
+                    <strong><span th:text="${card.bestScore}">46</span><span> / </span><span th:text="${card.bestMaxScore}">50</span></strong>
                     <span>Лучший результат</span>
                 </div>
 
@@ -828,7 +831,7 @@
                      th:text="${card.accuracy} + '%'">92%</div>
 
                 <div class="best-score">
-                    <strong><span th:text="${card.score}">46</span><span> / </span><span th:text="${card.questionCount}">50</span></strong>
+                    <strong><span th:text="${card.score}">46</span><span> / </span><span th:text="${card.maxScore}">50</span></strong>
                     <span>Результат попытки</span>
                 </div>
 

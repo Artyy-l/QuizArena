@@ -25,6 +25,7 @@ class QuestionType(str, Enum):
 class GenerationRequest(BaseModel):
     topic: str = Field(..., min_length=3)
     number: int = Field(..., ge=1, le=200)
+    has_material: bool = False
     question_types: list[QuestionType] = Field(
         default_factory=lambda: [QuestionType.single_choice]
     )
@@ -48,6 +49,7 @@ class GenerationRequest(BaseModel):
 class QuestionOption(BaseModel):
     id: str
     text: str
+    nominal: float | None = None
 
 
 class QuestionItem(BaseModel):

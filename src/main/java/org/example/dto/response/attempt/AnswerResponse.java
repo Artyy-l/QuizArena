@@ -3,6 +3,8 @@ package org.example.dto.response.attempt;
 import org.example.dto.response.quiz.QuestionDTO;
 
 import java.util.List;
+import java.util.Map;
+import java.math.BigDecimal;
 
 public record AnswerResponse(
   Boolean isCorrect,
@@ -11,5 +13,6 @@ public record AnswerResponse(
   List<Long> correctAnswerIds,
   Integer scoreEarned,
   QuestionDTO nextQuestion,
-  Long quizId
+  Long quizId,
+  Map<Long, BigDecimal> optionScores
 ) {}

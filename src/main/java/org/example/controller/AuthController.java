@@ -1,6 +1,6 @@
 package org.example.controller;
 
-import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.example.dto.request.auth.LoginRequest;
 import org.example.dto.request.auth.RegisterRequest;
@@ -9,6 +9,8 @@ import org.example.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,7 +30,8 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request, HttpServletResponse httpResponse) {
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request, HttpServletRequest httpRequest,
+                                      HttpServletResponse httpResponse) {
         try {
             if (request.username() == null || request.username().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(new ErrorResponse("Логин не может быть пустым"));
@@ -42,11 +45,7 @@ public class AuthController {
             
             AuthResponse response = authService.register(request);
             
-            Cookie tokenCookie = new Cookie("authToken", response.token());
-            tokenCookie.setHttpOnly(true);
-            tokenCookie.setPath("/");
-            tokenCookie.setMaxAge(authCookieMaxAgeSeconds);
-            httpResponse.addCookie(tokenCookie);
+            addAuthCookie(httpRequest, httpResponse, response.token());
             
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -62,7 +61,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletResponse httpResponse) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest,
+                                   HttpServletResponse httpResponse) {
         try {
             if (request.username() == null || request.username().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(new ErrorResponse("Логин не может быть пустым"));
@@ -73,11 +73,7 @@ public class AuthController {
             
             AuthResponse response = authService.login(request);
             
-            Cookie tokenCookie = new Cookie("authToken", response.token());
-            tokenCookie.setHttpOnly(true);
-            tokenCookie.setPath("/");
-            tokenCookie.setMaxAge(authCookieMaxAgeSeconds);
-            httpResponse.addCookie(tokenCookie);
+            addAuthCookie(httpRequest, httpResponse, response.token());
             
             return ResponseEntity.ok(response);
         } catch (SecurityException e) {
@@ -87,6 +83,17 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Внутренняя ошибка сервера"));
         }
+    }
+
+    private void addAuthCookie(HttpServletRequest request, HttpServletResponse response, String token) {
+        ResponseCookie cookie = ResponseCookie.from("authToken", token)
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .sameSite("Strict")
+                .path("/")
+                .maxAge(authCookieMaxAgeSeconds)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private record ErrorResponse(String message) {}

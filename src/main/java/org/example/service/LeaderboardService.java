@@ -97,7 +97,10 @@ public class LeaderboardService {
             if (attemptNumber != currentAttemptNumber) {
                 return attemptNumber < currentAttemptNumber;
             }
-            return timeSpent > 0 && (currentTime <= 0 || timeSpent < currentTime);
+            // Нулевая длительность допустима и выигрывает у более долгой попытки
+            // при равном счёте. Неположительные сохранённые значения считаются
+            // неизвестной длительностью старых попыток.
+            return currentTime <= 0 || timeSpent < currentTime;
         } catch (RuntimeException e) {
             return true;
         }

@@ -11,8 +11,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -36,22 +34,7 @@ public class AuthService {
         log.info("register() called, username={}", request.username());
 
         String login = request.username().trim();
-        log.debug("Нормализованный логин: '{}'", login);
-
-        if (log.isDebugEnabled()) {
-            try {
-                List<User> allUsers = userRepository.findAll();
-                log.debug("Всего пользователей в БД: {}", allUsers.size());
-                for (User u : allUsers) {
-                    log.debug("  Пользователь ID={}, login='{}'", u.getId(), u.getLogin());
-                }
-            } catch (Exception e) {
-                log.warn("Не удалось получить список пользователей: {}", e.getMessage());
-            }
-        }
-
         boolean exists = userRepository.existsByLogin(login);
-        log.debug("Пользователь с логином '{}' существует: {}", login, exists);
 
         if (exists) {
             log.warn("Попытка регистрации с занятым логином: '{}'", login);
@@ -62,15 +45,7 @@ public class AuthService {
         user.setLogin(login);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
 
-        log.debug("Сохранение пользователя в БД...");
         user = userRepository.save(user);
-        log.info("Пользователь сохранен, id={}, login='{}'", user.getId(), user.getLogin());
-
-        Optional<User> savedUser = userRepository.findById(user.getId());
-        if (savedUser.isEmpty()) {
-            log.error("Пользователь не найден в БД после сохранения, id={}", user.getId());
-            throw new IllegalStateException("Ошибка при сохранении пользователя");
-        }
 
         String token = jwtService.generateToken(user);
 
@@ -80,18 +55,6 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         log.info("login() called, username={}", request.username());
-
-        if (log.isDebugEnabled()) {
-            try {
-                List<User> allUsers = userRepository.findAll();
-                log.debug("Всего пользователей в БД: {}", allUsers.size());
-                for (User u : allUsers) {
-                    log.debug("  Пользователь ID={}, login='{}'", u.getId(), u.getLogin());
-                }
-            } catch (Exception e) {
-                log.warn("Не удалось получить список пользователей: {}", e.getMessage());
-            }
-        }
 
         String login = request.username().trim();
         log.debug("Поиск пользователя с логином: '{}'", login);

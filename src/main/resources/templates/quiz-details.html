@@ -96,6 +96,9 @@
             font-size: 1.1rem;
         }
     </style>
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <div class="container">
@@ -130,6 +133,12 @@
             <div class="info-item" th:if="${quiz != null and quiz.author != null}">
                 <div class="info-label">Автор</div>
                 <div class="info-value" th:text="${quiz.author}">-</div>
+            </div>
+            <div class="info-item" th:if="${quiz != null and quiz.materials != null and !quiz.materials.isEmpty()}">
+                <div class="info-label">Исходный материал</div>
+                <a class="info-value" th:href="@{/api/quizzes/{id}/materials/download(id=${quiz.id})}">
+                    Скачать материал
+                </a>
             </div>
         </div>
     </div>

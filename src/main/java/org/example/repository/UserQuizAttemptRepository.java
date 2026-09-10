@@ -16,7 +16,9 @@ public interface UserQuizAttemptRepository extends JpaRepository<UserQuizAttempt
     Page<UserQuizAttempt> findByUserId(Long userId, Pageable pageable);
     List<UserQuizAttempt> findByQuizId(Long quizId);
 
-    @Query("SELECT u FROM UserQuizAttempt u JOIN FETCH u.quiz q WHERE u.user.id = :userId " +
+    @Query("SELECT DISTINCT u FROM UserQuizAttempt u JOIN FETCH u.quiz q " +
+           "LEFT JOIN FETCH u.attemptQuestions aq LEFT JOIN FETCH aq.question " +
+           "WHERE u.user.id = :userId " +
            "AND u.isCompleted = true AND u.startTime IS NOT NULL AND u.finishTime IS NOT NULL " +
            "ORDER BY u.finishTime DESC")
     List<UserQuizAttempt> findCompletedHistoryByUserId(@Param("userId") Long userId);

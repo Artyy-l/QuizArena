@@ -8,6 +8,7 @@ import org.example.dto.common.AttemptSummary;
 import org.example.dto.common.Statistics;
 import org.example.model.User;
 import org.example.model.UserQuizAttempt;
+import org.example.mapper.QuizMapper;
 import org.example.repository.QuizRepository;
 import org.example.repository.UserQuizAttemptRepository;
 import org.example.repository.UserRepository;
@@ -65,31 +66,23 @@ public class UserService {
 
         user = userRepository.save(user);
 
-        long totalQuizzes = quizRepository.countByCreatedById(user.getId());
-        long totalAttempts = attemptRepository.countByUserId(user.getId());
-
-        return new UserProfileDTO(
-                user.getId(),
-                user.getLogin(),
-                null,
-                (int) totalQuizzes,
-                (int) totalAttempts
-        );
+        return toProfileDTO(user);
     }
 
     public UserProfileDTO getUserProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
-        long totalQuizzes = quizRepository.countByCreatedById(userId);
-        long totalAttempts = attemptRepository.countByUserId(userId);
+        return toProfileDTO(user);
+    }
 
+    private UserProfileDTO toProfileDTO(User user) {
         return new UserProfileDTO(
                 user.getId(),
                 user.getLogin(),
                 null,
-                (int) totalQuizzes,
-                (int) totalAttempts
+                (int) quizRepository.countByCreatedById(user.getId()),
+                (int) attemptRepository.countByUserId(user.getId())
         );
     }
 
@@ -141,34 +134,8 @@ public class UserService {
         }
 
         return quizRepository.findByCreatedById(userId).stream()
-                .map(this::toQuizDTO)
+                .map(QuizMapper::fromEntity)
                 .collect(Collectors.toList());
-    }
-
-    private QuizDTO toQuizDTO(org.example.model.Quiz quiz) {
-        int questionCount = quiz.getQuestionNumber() != null ? quiz.getQuestionNumber() : 0;
-        
-        Integer totalTimeSeconds = null;
-        Integer timePerQuestionSeconds = null;
-        if (quiz.getTimePerQuestion() != null && quiz.getTimePerQuestion().getSeconds() > 0) {
-            long secondsPerQuestion = quiz.getTimePerQuestion().getSeconds();
-            timePerQuestionSeconds = (int) secondsPerQuestion;
-            if (questionCount > 0) {
-                totalTimeSeconds = (int) (secondsPerQuestion * questionCount);
-            }
-        }
-        
-        return new QuizDTO(
-                quiz.getId(),
-                quiz.getName(),
-                quiz.getCreatedBy().getLogin(),
-                questionCount,
-                totalTimeSeconds,
-                timePerQuestionSeconds,
-                !quiz.isPrivate(),
-                quiz.isStatic(),
-                toLocalDateTime(quiz.getCreatedAt())
-        );
     }
 
     private LocalDateTime toLocalDateTime(java.time.Instant instant) {

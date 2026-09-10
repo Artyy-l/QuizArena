@@ -71,6 +71,16 @@ public class AuthInterceptor implements HandlerInterceptor {
                 response.sendRedirect("/login");
                 return false;
             }
+
+            // Межсайтовая форма может отправить cookie, но не может передать этот JWT-заголовок.
+            if (path.startsWith("/api/") && isUnsafeMethod(method)
+                    && !("POST".equals(method) && "/api/quizzes/search".equals(path))
+                    && !hasValidBearerToken(request)) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Для изменения данных нужен токен в заголовке Authorization\"}");
+                return false;
+            }
         }
 
         return true;
@@ -85,5 +95,15 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
         return PROTECTED_PATHS.stream().anyMatch(path::startsWith);
+    }
+
+    private boolean isUnsafeMethod(String method) {
+        return !"GET".equals(method) && !"HEAD".equals(method) && !"OPTIONS".equals(method);
+    }
+
+    private boolean hasValidBearerToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        return header != null && header.startsWith("Bearer ")
+                && jwtService.isValid(header.substring(7));
     }
 }

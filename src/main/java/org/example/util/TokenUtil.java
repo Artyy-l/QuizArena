@@ -22,6 +22,6 @@ public final class TokenUtil {
             }
         }
 
-        return request.getParameter("token");
+        return null;
     }
 }

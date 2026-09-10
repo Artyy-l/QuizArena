@@ -4,90 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Авторизация - QuizArena</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .auth-box {
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            width: 350px;
-        }
-        h2 {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #333;
-            font-size: 2em;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-bottom: 10px;
-            font-size: 16px;
-            transition: transform 0.2s;
-        }
-
-        .register-btn {
-            background: transparent;
-            color: #667eea;
-            border: 2px solid #667eea;
-        }
-        .error-message {
-            color: #e74c3c;
-            font-size: 14px;
-            margin-top: 5px;
-            display: none;
-        }
-        .error-message.show {
-            display: block;
-        }
-    </style>
+    <style>html, body { background-color: #090719; }</style>
+    <link rel="preload" as="image" href="/images/space_for_game.png" fetchpriority="high">
+    <link rel="stylesheet" href="/css/auth.css">
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
-<div class="auth-box">
-    <h2>Авторизация</h2>
+<main class="auth-box">
+    <div class="auth-heading">
+        <div class="auth-icon"><i data-lucide="log-in" aria-hidden="true"></i></div>
+        <h1>С возвращением!</h1>
+        <p>Войдите в QuizArena, чтобы продолжить игру.</p>
+    </div>
     <form id="loginForm">
         <div class="form-group">
-            <input type="text" id="username" name="username" placeholder="Логин" required>
+            <label for="username"><i data-lucide="user-round" aria-hidden="true"></i>Логин</label>
+            <input type="text" id="username" name="username" placeholder="Введите логин" autocomplete="username" required>
         </div>
         <div class="form-group">
-            <input type="password" id="password" name="password" placeholder="Пароль" required>
+            <label for="password"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Пароль</label>
+            <input type="password" id="password" name="password" placeholder="Введите пароль" autocomplete="current-password" required>
         </div>
-        <div class="error-message" id="errorMessage"></div>
-        <button type="submit">Войти</button>
-        <button type="button" class="register-btn" onclick="goToRegister()">Зарегистрироваться</button>
+        <div class="error-message" id="errorMessage" role="alert"></div>
+        <div class="auth-actions">
+            <button type="submit" class="primary-btn">Войти</button>
+            <button type="button" class="secondary-btn" onclick="goToRegister()">Зарегистрироваться</button>
+        </div>
     </form>
-</div>
+</main>
+<script src="https://unpkg.com/lucide@latest"></script>
 <script>
+    if (window.lucide) lucide.createIcons();
     function goToRegister() {
         window.location.href = '/register';
     }

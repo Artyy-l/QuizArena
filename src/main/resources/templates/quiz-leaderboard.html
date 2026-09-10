@@ -202,6 +202,9 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <div class="main-content">
@@ -300,11 +303,7 @@
     }
 
     function submitRestartAttempt(quizId) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/quiz/' + quizId + '/attempt/restart';
-        document.body.appendChild(form);
-        form.submit();
+        window.location.href = '/quiz/' + quizId + '/attempt';
     }
 </script>
 </body>

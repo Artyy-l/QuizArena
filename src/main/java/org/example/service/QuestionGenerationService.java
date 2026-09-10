@@ -22,18 +22,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,10 +56,12 @@ public class QuestionGenerationService {
     private static final String REASON_RETRIES_EXHAUSTED = "RETRIES_EXHAUSTED";
     private static final String MESSAGE_UNETHICAL = "Промпт или материал не прошёл проверку безопасности. Квиз по этим данным создан не будет.";
     private static final String MESSAGE_GENERATION_FAILED = "Не удалось сгенерировать вопросы для этого квиза. Попробуйте изменить промпт или материал.";
+    private static final String MESSAGE_INSUFFICIENT_QUESTIONS = "ML-сервис вернул недостаточно валидных вопросов: получено %d из %d запрошенных.";
     private static final String MESSAGE_ML_UNAVAILABLE = "ML-сервис сейчас недоступен. Генерация этого квиза остановлена, попробуйте позже.";
     private static final String MESSAGE_RETRIES_EXHAUSTED = "ML-сервис не успел завершить генерацию. Квиз не будет создан автоматически, попробуйте запустить создание позже.";
     private static final int DEFAULT_GENERATION_QUESTION_COUNT = 10;
     private static final int MAX_ML_GENERATION_QUESTION_COUNT = 50;
+    private static final long KAFKA_SEND_CONFIRMATION_TIMEOUT_SECONDS = 30;
 
     private final GenerationSetRepository generationSetRepository;
     private final QuizRepository quizRepository;
@@ -154,10 +162,35 @@ public class QuestionGenerationService {
 
     private void sendKafkaRequest(GenerationSet questionSet, QuizGenerationRequestMessage kafkaRequest) {
         try {
-            requestKafkaTemplate.send(requestTopic, kafkaRequest.correlationId(), kafkaRequest);
-        } catch (Exception e) {
+            awaitKafkaSend(kafkaRequest);
+        } catch (GenerationRetryableException e) {
             markGenerationSetFailed(questionSet, REASON_ML_UNAVAILABLE, MESSAGE_ML_UNAVAILABLE);
-            throw new RuntimeException("Kafka send failed", e);
+            throw e;
+        }
+    }
+
+    /** Ожидание результата асинхронной отправки Kafka позволяет обнаружить сбой брокера или сериализации. */
+    private void awaitKafkaSend(QuizGenerationRequestMessage kafkaRequest) {
+        CompletableFuture<SendResult<String, QuizGenerationRequestMessage>> sendFuture;
+        try {
+            sendFuture = requestKafkaTemplate.send(requestTopic, kafkaRequest.correlationId(), kafkaRequest);
+        } catch (RuntimeException e) {
+            throw new GenerationRetryableException("Не удалось отправить сообщение генерации в Kafka", e);
+        }
+
+        if (sendFuture == null) {
+            throw new GenerationRetryableException("Kafka не вернула подтверждение отправки сообщения генерации");
+        }
+
+        try {
+            sendFuture.get(KAFKA_SEND_CONFIRMATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new GenerationRetryableException("Отправка сообщения генерации в Kafka была прервана", e);
+        } catch (ExecutionException | TimeoutException e) {
+            throw new GenerationRetryableException("Kafka не подтвердила отправку сообщения генерации", e);
+        } catch (RuntimeException e) {
+            throw new GenerationRetryableException("Kafka не подтвердила отправку сообщения генерации", e);
         }
     }
 
@@ -203,11 +236,15 @@ public class QuestionGenerationService {
             metricsService.recordGenerationUnethical();
             metricsService.getGenerationDurationTimer().record(System.nanoTime() - generationStart, TimeUnit.NANOSECONDS);
         } catch (GenerationNonRetryableException | IllegalArgumentException e) {
-            markGenerationSetFailed(generationSet, REASON_GENERATION_FAILED, userFriendlyFailureMessage(e, MESSAGE_GENERATION_FAILED));
+            if (generationSet == null || !STATUS_FAILED.equals(generationSet.getStatus())) {
+                markGenerationSetFailed(generationSet, REASON_GENERATION_FAILED, userFriendlyFailureMessage(e, MESSAGE_GENERATION_FAILED));
+            }
             metricsService.recordGenerationFailed();
             metricsService.getGenerationDurationTimer().record(System.nanoTime() - generationStart, TimeUnit.NANOSECONDS);
         } catch (Exception e) {
-            markGenerationSetFailed(generationSet, REASON_ML_UNAVAILABLE, userFriendlyFailureMessage(e, MESSAGE_ML_UNAVAILABLE));
+            if (generationSet == null || !STATUS_FAILED.equals(generationSet.getStatus())) {
+                markGenerationSetFailed(generationSet, REASON_ML_UNAVAILABLE, userFriendlyFailureMessage(e, MESSAGE_ML_UNAVAILABLE));
+            }
             metricsService.recordGenerationFailed();
             metricsService.getGenerationDurationTimer().record(System.nanoTime() - generationStart, TimeUnit.NANOSECONDS);
         }
@@ -231,17 +268,33 @@ public class QuestionGenerationService {
             return;
         }
 
+        boolean hasMaterial = kafkaRequest.materialFileUrls() != null
+                && !kafkaRequest.materialFileUrls().isEmpty();
         if (kafkaRequest.prompt() != null && !kafkaRequest.prompt().trim().isEmpty()
-                && fastApiClient.checkPromptEthics(kafkaRequest.prompt())) {
+                && fastApiClient.checkPromptEthics(kafkaRequest.prompt(), hasMaterial)) {
+            metricsService.recordGenerationUnethical();
+            markGenerationSetFailed(generationSet, REASON_UNETHICAL, MESSAGE_UNETHICAL);
+            return;
+        }
+        QuestionType preferred = parsePreferredQuestionType(kafkaRequest.preferredQuestionType());
+        int questionCount = normalizeGenerationQuestionCount(kafkaRequest.questionCount());
+        List<Path> materialFiles = resolveMaterialFiles(
+                kafkaRequest.quizId(), kafkaRequest.materialFileUrls());
+        String generationPrompt = buildPromptWithExtractedMaterials(kafkaRequest.prompt(), materialFiles);
+
+        // Проверяем весь текст, отправляемый генератору, включая извлечённый из
+        // файлов. Запрещённые темы, ненормативная лексика и prompt injection
+        // из документа не должны попасть в LLM, даже если запрос пользователя безвреден.
+        String materialText = materialFiles.stream()
+                .map(textExtractorService::extractText)
+                .filter(text -> text != null && !text.isBlank())
+                .collect(Collectors.joining("\n\n"));
+        if (!materialText.isBlank() && fastApiClient.checkMaterialSafety(materialText)) {
             metricsService.recordGenerationUnethical();
             markGenerationSetFailed(generationSet, REASON_UNETHICAL, MESSAGE_UNETHICAL);
             return;
         }
 
-        QuestionType preferred = parsePreferredQuestionType(kafkaRequest.preferredQuestionType());
-        int questionCount = normalizeGenerationQuestionCount(kafkaRequest.questionCount());
-        List<Path> materialFiles = resolveMaterialFiles(kafkaRequest.materialFileUrls());
-        String generationPrompt = buildPromptWithExtractedMaterials(kafkaRequest.prompt(), materialFiles);
         logger.info(
                 "Starting ML generation for questionSetId={}, quizId={}, materialFiles={}, extractedPromptLength={}",
                 generationSet.getId(),
@@ -252,7 +305,8 @@ public class QuestionGenerationService {
         MlJobStateDTO job = fastApiClient.startGenerationJob(
                 generationPrompt,
                 questionCount,
-                preferred
+                preferred,
+                hasMaterial
         );
 
         generationSet.setStatus(STATUS_WAITING_FOR_ML);
@@ -325,13 +379,13 @@ public class QuestionGenerationService {
                 originalRequest.materialFileUrls()
         );
         try {
-            requestKafkaTemplate.send(requestTopic, pollRequest.correlationId(), pollRequest);
-        } catch (Exception e) {
+            awaitKafkaSend(pollRequest);
+        } catch (GenerationRetryableException e) {
             throw new GenerationRetryableException("Не удалось поставить сообщение проверки ML в очередь", e);
         }
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = GenerationInsufficientQuestionsException.class)
     public QuestionGenerationResponse generateExistingQuestionSet(Long questionSetId, QuestionGenerationRequest request) {
         GenerationSet existingSet = generationSetRepository.findById(questionSetId)
                 .orElseThrow(() -> new IllegalArgumentException("Набор генерации не найден"));
@@ -382,7 +436,17 @@ public class QuestionGenerationService {
         questionRepository.deleteByGenerationSetId(questionSet.getId());
 
         if (mlQuestions == null || mlQuestions.isEmpty()) {
-            throw new GenerationNonRetryableException("ML-сервис не вернул вопросы");
+            String message = String.format(
+                    java.util.Locale.ROOT,
+                    MESSAGE_INSUFFICIENT_QUESTIONS,
+                    0,
+                    questionCount
+            );
+            questionSet.setGeneratedCount(0);
+            questionSet.setValidCount(0);
+            questionSet.setFinalCount(0);
+            markGenerationSetFailed(questionSet, REASON_GENERATION_FAILED, message);
+            throw new GenerationInsufficientQuestionsException(message);
         }
 
         for (int i = 0; i < mlQuestions.size() && generatedQuestions.size() < questionCount; i++) {
@@ -393,18 +457,24 @@ public class QuestionGenerationService {
             }
 
             QuestionType type = mapMlType(mq.type(), request.preferredQuestionType());
-            List<MlQuestionOptionDTO> options = mq.options() != null ? mq.options() : List.of();
+            String questionText = normalizeDatabaseText(mq.question()).trim();
+            String explanation = normalizeDatabaseText(mq.explanation()).trim();
+            List<MlQuestionOptionDTO> options = mq.options() == null
+                    ? List.of()
+                    : mq.options().stream()
+                            .map(this::normalizeOptionText)
+                            .collect(Collectors.toList());
             List<String> correctIds = mq.correct_answers() != null ? mq.correct_answers() : List.of();
-            String explanation = mq.explanation() != null ? mq.explanation().trim() : "";
 
-            if (!isValidMlQuestion(type, options, correctIds) || hasEncodingDamage(mq.question(), explanation, options)) {
+            if (questionText.isEmpty() || !isValidMlQuestion(type, options, correctIds)
+                    || hasEncodingDamage(questionText, explanation, options)) {
                 metricsService.recordValidationFailed();
                 continue;
             }
 
             Question question = new Question();
             question.setQuiz(quiz);
-            question.setText(mq.question().trim());
+            question.setText(questionText);
             question.setType(type);
             question.setGenerationSetId(questionSet.getId());
 
@@ -416,7 +486,33 @@ public class QuestionGenerationService {
         }
 
         if (generatedQuestions.isEmpty()) {
-            throw new GenerationNonRetryableException("Не удалось сохранить ни одного валидного вопроса из ответа ML-сервиса");
+            String message = String.format(
+                    java.util.Locale.ROOT,
+                    MESSAGE_INSUFFICIENT_QUESTIONS,
+                    0,
+                    questionCount
+            );
+            questionSet.setGeneratedCount(0);
+            questionSet.setValidCount(0);
+            questionSet.setFinalCount(0);
+            markGenerationSetFailed(questionSet, REASON_GENERATION_FAILED, message);
+            throw new GenerationInsufficientQuestionsException(message);
+        }
+
+        if (generatedQuestions.size() < questionCount) {
+            String message = String.format(
+                    java.util.Locale.ROOT,
+                    MESSAGE_INSUFFICIENT_QUESTIONS,
+                    generatedQuestions.size(),
+                    questionCount
+            );
+            questionSet.setGeneratedCount(generatedQuestions.size());
+            questionSet.setValidCount(generatedQuestions.size());
+            questionSet.setFinalCount(generatedQuestions.size());
+            // Не сохраняем в квизе неполный набор вопросов.
+            questionRepository.deleteByGenerationSetId(questionSet.getId());
+            markGenerationSetFailed(questionSet, REASON_GENERATION_FAILED, message);
+            throw new GenerationInsufficientQuestionsException(message);
         }
 
         questionSet.setGeneratedCount(generatedQuestions.size());
@@ -440,7 +536,7 @@ public class QuestionGenerationService {
         );
     }
 
-    private boolean isValidMlQuestion(QuestionType type, List<MlQuestionOptionDTO> options, List<String> correctIds) {
+    static boolean isValidMlQuestion(QuestionType type, List<MlQuestionOptionDTO> options, List<String> correctIds) {
         long optionCount = options.stream()
                 .filter(o -> o != null && o.text() != null && !o.text().trim().isEmpty())
                 .count();
@@ -451,7 +547,37 @@ public class QuestionGenerationService {
         long wrongCount = optionCount - correctCount;
 
         if (type == QuestionType.HUNDRED_TO_ONE) {
-            return optionCount == 8 && correctCount == 5 && wrongCount == 3;
+            if (optionCount != 8 || correctCount != 5 || wrongCount != 3) {
+                return false;
+            }
+            Set<String> optionIds = new java.util.HashSet<>();
+            Set<BigDecimal> positiveNominals = new java.util.HashSet<>();
+            for (MlQuestionOptionDTO option : options) {
+                if (option == null || option.id() == null || option.id().isBlank()
+                        || !optionIds.add(option.id().trim().toUpperCase(java.util.Locale.ROOT))) {
+                    return false;
+                }
+                BigDecimal nominal = option.nominal();
+                if (nominal == null) {
+                    return false;
+                }
+                boolean correct = correctIds.stream().anyMatch(id -> id != null && id.equalsIgnoreCase(option.id().trim()));
+                if (correct) {
+                    if (nominal.compareTo(BigDecimal.ONE) < 0 || nominal.compareTo(new BigDecimal("5")) > 0
+                            || nominal.multiply(new BigDecimal("2")).stripTrailingZeros().scale() > 0
+                            || !positiveNominals.add(nominal.stripTrailingZeros())) {
+                        return false;
+                    }
+                } else if (nominal.signum() != 0) {
+                    return false;
+                }
+            }
+            Set<String> normalizedCorrectIds = correctIds.stream()
+                    .filter(id -> id != null && !id.isBlank())
+                    .map(id -> id.trim().toUpperCase(java.util.Locale.ROOT))
+                    .collect(Collectors.toSet());
+            return positiveNominals.size() == 5 && normalizedCorrectIds.size() == 5
+                    && optionIds.containsAll(normalizedCorrectIds);
         }
         if (type == QuestionType.SINGLE_CHOICE) {
             return optionCount >= 3 && optionCount <= 6 && correctCount == 1;
@@ -476,6 +602,21 @@ public class QuestionGenerationService {
                 .anyMatch(option -> option != null && containsReplacementCharacter(option.text()));
     }
 
+    static String normalizeDatabaseText(String value) {
+        return value == null ? "" : value.replace("\u0000", "");
+    }
+
+    private MlQuestionOptionDTO normalizeOptionText(MlQuestionOptionDTO option) {
+        if (option == null) {
+            return null;
+        }
+        return new MlQuestionOptionDTO(
+                option.id(),
+                normalizeDatabaseText(option.text()),
+                option.nominal()
+        );
+    }
+
     private boolean containsReplacementCharacter(String value) {
         return value != null && value.indexOf('\uFFFD') >= 0;
     }
@@ -498,6 +639,9 @@ public class QuestionGenerationService {
                 }
             }
             ao.setCorrect(isCorrect);
+            if (question.getType() == QuestionType.HUNDRED_TO_ONE) {
+                ao.setNominal(opt.nominal());
+            }
             answerOptionRepository.save(ao);
         }
     }
@@ -554,13 +698,30 @@ public class QuestionGenerationService {
                 .collect(Collectors.toList());
     }
 
-    private List<Path> resolveMaterialFiles(List<String> materialFileUrls) {
+    private List<Path> resolveMaterialFiles(Long quizId, List<String> materialFileUrls) {
         if (materialFileUrls == null || materialFileUrls.isEmpty()) {
             return List.of();
         }
         return materialFileUrls.stream()
-                .map(fileStorageService::resolveMaterialUrl)
+                .map(url -> fileStorageService.resolveQuizMaterialUrl(quizId, url))
                 .collect(Collectors.toList());
+    }
+
+    public void checkUploadedMaterial(String prompt, Path materialFile)
+            throws IOException, InterruptedException {
+        checkPromptSafety(prompt, true);
+        String materialText = textExtractorService.extractText(materialFile);
+        if (!materialText.isBlank() && fastApiClient.checkMaterialSafety(materialText)) {
+            throw new UnethicalPromptException(MESSAGE_UNETHICAL);
+        }
+    }
+
+    public void checkPromptSafety(String prompt, boolean hasMaterial)
+            throws IOException, InterruptedException {
+        if (prompt != null && !prompt.trim().isEmpty()
+                && fastApiClient.checkPromptEthics(prompt, hasMaterial)) {
+            throw new UnethicalPromptException(MESSAGE_UNETHICAL);
+        }
     }
 
     private String buildPromptWithExtractedMaterials(String prompt, List<Path> materialFiles) {
@@ -638,7 +799,7 @@ public class QuestionGenerationService {
         };
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = GenerationInsufficientQuestionsException.class)
     public QuestionGenerationResponse generateQuizQuestions(QuestionGenerationRequest request) {
         Quiz quiz = quizRepository.findById(request.quizId())
                 .orElseThrow(() -> new IllegalArgumentException("Квиз не найден: " + request.quizId()));

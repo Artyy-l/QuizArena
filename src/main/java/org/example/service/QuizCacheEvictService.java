@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 public class QuizCacheEvictService {
-    private static final String QUIZ_CACHE_KEY = "quiz:%d";
+    private static final String QUIZ_CACHE_KEY = "quiz:v2:%d";
 
     private final RedisTemplate<String, String> redisTemplate;
 

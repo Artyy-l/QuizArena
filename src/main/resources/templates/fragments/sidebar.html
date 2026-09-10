@@ -8,7 +8,7 @@
     </a>
 
     <div class="profile">
-        <a class="profile-card" href="/profile" aria-label="Профиль" data-tooltip="Профиль">
+        <a class="profile-card" href="/edit-profile" aria-label="Профиль" data-tooltip="Профиль">
             <span class="profile-main">
                 <span class="profile-avatar"
                       th:text="${currentUsername != null and !#strings.isEmpty(currentUsername) ? #strings.substring(currentUsername, 0, 1) : 'Q'}">Q</span>
@@ -33,11 +33,6 @@
         <a href="/history" aria-label="История" data-tooltip="История" th:classappend="${activePage == 'history'} ? ' active' : ''">
             <i class="nav-icon" data-lucide="clock-3" aria-hidden="true"></i>
             <span class="nav-label">История</span>
-        </a>
-        <span class="nav-divider"></span>
-        <a href="/profile" aria-label="Настройки" data-tooltip="Настройки" th:classappend="${activePage == 'profile'} ? ' active' : ''">
-            <i class="nav-icon" data-lucide="settings" aria-hidden="true"></i>
-            <span class="nav-label">Настройки</span>
         </a>
         <a href="/login" aria-label="Выйти" data-tooltip="Выйти">
             <i class="nav-icon" data-lucide="log-out" aria-hidden="true"></i>

@@ -15,10 +15,10 @@ import org.example.dto.response.generation.*;
 import org.example.dto.common.*;
 import org.example.repository.*;
 import org.example.model.UserQuizAttempt;
+import org.example.mapper.QuizMapper;
 import org.example.service.AttemptService;
 import org.example.service.JwtService;
 import org.example.service.QuizService;
-import org.example.service.ApiService;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +49,6 @@ public class PageController {
     private final ApiController apiController;
     private final QuizService quizService;
     private final UserQuizAttemptRepository attemptRepository;
-    private final ApiService apiService;
     private final org.example.repository.MultiplayerSessionRepository multiplayerSessionRepository;
     private final org.example.repository.UserRepository userRepository;
     private final org.example.repository.QuizRepository quizRepository;
@@ -57,11 +56,10 @@ public class PageController {
     private final JwtService jwtService;
 
     @Autowired
-    public PageController(ApiController apiController, QuizService quizService, UserQuizAttemptRepository attemptRepository, ApiService apiService, org.example.repository.MultiplayerSessionRepository multiplayerSessionRepository, org.example.repository.UserRepository userRepository, org.example.repository.QuizRepository quizRepository, AttemptService attemptService, JwtService jwtService) {
+    public PageController(ApiController apiController, QuizService quizService, UserQuizAttemptRepository attemptRepository, org.example.repository.MultiplayerSessionRepository multiplayerSessionRepository, org.example.repository.UserRepository userRepository, org.example.repository.QuizRepository quizRepository, AttemptService attemptService, JwtService jwtService) {
         this.apiController = apiController;
         this.quizService = quizService;
         this.attemptRepository = attemptRepository;
-        this.apiService = apiService;
         this.multiplayerSessionRepository = multiplayerSessionRepository;
         this.userRepository = userRepository;
         this.quizRepository = quizRepository;
@@ -99,7 +97,7 @@ public class PageController {
         Long userId = resolveCurrentUserId(httpRequest);
 
         QuizSearchRequest request = new QuizSearchRequest(searchQuery, sortBy, ascending, pageNumber, pageSize);
-        QuizSearchResponse response = apiService.searchPublicQuizzes(request);
+        QuizSearchResponse response = apiController.searchPublicQuizzes(request);
         long totalElements = response.totalElements() != null ? response.totalElements() : 0L;
         long shownFrom = totalElements > 0 ? (long) response.currentPage() * pageSize + 1L : 0L;
         long shownTo = Math.min(((long) response.currentPage() + 1L) * pageSize, totalElements);
@@ -181,6 +179,7 @@ public class PageController {
             UserProfileDTO userProfile = apiController.getUserProfile(userId);
             model.addAttribute("userProfile", userProfile);
             model.addAttribute("userId", userId);
+            model.addAttribute("currentUsername", userProfile.username());
             return "edit-profile";
         } catch (Exception e) {
             return "redirect:/profile";
@@ -358,11 +357,14 @@ public class PageController {
                     .filter(java.util.Objects::nonNull)
                     .max(Integer::compareTo)
                     .orElse(0);
-            long bestScore = quizAttempts.stream()
-                    .map(UserQuizAttempt::getScore)
-                    .filter(java.util.Objects::nonNull)
-                    .max(Long::compareTo)
-                    .orElse(0L);
+            UserQuizAttempt bestAttempt = latestAttempt;
+            for (UserQuizAttempt attempt : quizAttempts) {
+                if (getHistoryScore(attempt) > getHistoryScore(bestAttempt)) {
+                    bestAttempt = attempt;
+                }
+            }
+            long bestScore = getHistoryScore(bestAttempt);
+            int bestMaxScore = getMaximumScore(bestAttempt);
             List<Integer> accuracySeries = quizAttempts.stream()
                     .sorted(Comparator.comparing(UserQuizAttempt::getFinishTime))
                     .map(attempt -> attempt.getAccuracyPercent() != null ? attempt.getAccuracyPercent() : 0)
@@ -376,6 +378,7 @@ public class PageController {
                     !quiz.isPrivate(),
                     bestAccuracy,
                     bestScore,
+                    bestMaxScore,
                     latestAttempt.getFinishTime() != null
                             ? java.time.LocalDateTime.ofInstant(latestAttempt.getFinishTime(), java.time.ZoneId.systemDefault())
                             : null,
@@ -430,7 +433,8 @@ public class PageController {
             totalTimeSeconds = (int) (quiz.getTimePerQuestion().getSeconds() * questionCount);
         }
         int accuracy = attempt.getAccuracyPercent() != null ? attempt.getAccuracyPercent() : 0;
-        long score = attempt.getScore() != null ? attempt.getScore() : 0L;
+        long score = getHistoryScore(attempt);
+        int maxScore = getMaximumScore(attempt);
         return new HistoryAttemptCard(
                 attempt.getId(),
                 quiz.getId(),
@@ -440,11 +444,36 @@ public class PageController {
                 !quiz.isPrivate(),
                 accuracy,
                 score,
+                maxScore,
                 attempt.getFinishTime() != null
                         ? java.time.LocalDateTime.ofInstant(attempt.getFinishTime(), java.time.ZoneId.systemDefault())
                         : null,
                 accuracyTone(accuracy)
         );
+    }
+
+    static long getHistoryScore(UserQuizAttempt attempt) {
+        if (attempt.getBaseScore() != null) {
+            return attempt.getBaseScore();
+        }
+        long score = attempt.getScore() != null ? attempt.getScore() : 0L;
+        return score - (attempt.getCatStakeBonus() != null ? attempt.getCatStakeBonus() : 0);
+    }
+
+    static int getMaximumScore(UserQuizAttempt attempt) {
+        List<org.example.model.AttemptQuestion> attemptQuestions = attempt.getAttemptQuestions();
+        if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
+            return attemptQuestions.stream()
+                    .map(org.example.model.AttemptQuestion::getQuestion)
+                    .filter(java.util.Objects::nonNull)
+                    .mapToInt(question -> question.getType() == org.example.model.QuestionType.HUNDRED_TO_ONE ? 5 : 1)
+                    .sum();
+        }
+
+        int questionCount = attempt.getQuiz().getQuestionNumber() != null
+                ? attempt.getQuiz().getQuestionNumber() : 0;
+        return attempt.getQuiz().getDefaultQuestionType() == org.example.model.QuestionType.HUNDRED_TO_ONE
+                ? questionCount * 5 : questionCount;
     }
 
     private String normalizeHistorySort(String sort) {
@@ -495,6 +524,7 @@ public class PageController {
                                   Boolean isPublic,
                                   Integer bestAccuracy,
                                   Long bestScore,
+                                  Integer bestMaxScore,
                                   java.time.LocalDateTime lastAttemptAt,
                                   List<Integer> accuracySeries,
                                   String graphPoints,
@@ -509,6 +539,7 @@ public class PageController {
                                      Boolean isPublic,
                                      Integer accuracy,
                                      Long score,
+                                     Integer maxScore,
                                      java.time.LocalDateTime attemptAt,
                                      String accuracyTone) {
     }
@@ -516,71 +547,16 @@ public class PageController {
     @GetMapping("/quiz")
     public String quizPage(
         @RequestParam(required = false) Long quizId,
-        @RequestParam(required = false) Long userId,
         @RequestParam(required = false) String sessionId,
+        HttpServletRequest request,
         HttpServletResponse response,
         Model model) {
+        Long userId = jwtService.extractUserIdFromRequest(request);
         if (quizId != null && findAccessibleQuiz(quizId, userId).isEmpty()) {
             return renderNotFound(response, model);
         }
 
-        QuizDTO quiz = null;
-        LeaderboardDTO leaderboard = null;
-        boolean hasQuestions = false;
-
-        if (quizId != null) {
-            try {
-                QuizDetailsDTO quizDetails = quizService.getQuiz(quizId, userId);
-                hasQuestions = quizDetails.questions() != null && !quizDetails.questions().isEmpty();
-                quiz = new QuizDTO(
-                    quizDetails.id(),
-                    quizDetails.name(),
-                    quizDetails.author(),
-                    quizDetails.questions() != null ? quizDetails.questions().size() : 0,
-                    quizDetails.timeLimit(),
-                    quizDetails.timePerQuestion(),
-                    quizDetails.isPublic(),
-                    quizDetails.isStatic(),
-                    quizDetails.createdAt()
-                );
-            } catch (Exception e) {
-                log.debug("Не удалось загрузить карточку квиза {}", quizId, e);
-            }
-        }
-
-        if (quizId != null && userId != null) {
-            try {
-                leaderboard = quizService.getQuizLeaderboard(quizId, userId, "solo");
-            } catch (Exception e) {
-                log.debug("Не удалось загрузить лидерборд квиза {}", quizId, e);
-            }
-        }
-        List<QuizDTO> quizzes = quiz != null ? List.of(quiz) : List.of();
-
-        boolean isAdmin = isAdmin(userId);
-        boolean isCreator = isQuizCreator(quizId, userId);
-        boolean isMultiplayerHost = isMultiplayerHost(sessionId, userId);
-
-        model.addAttribute("quizzes", quizzes);
-        model.addAttribute("leaderboard", leaderboard);
-        model.addAttribute("quizId", quizId);
-        model.addAttribute("userId", userId);
-        model.addAttribute("hasQuestions", hasQuestions);
-        model.addAttribute("isAdmin", isAdmin);
-        model.addAttribute("isCreator", isCreator);
-        model.addAttribute("sessionId", sessionId);
-        model.addAttribute("isMultiplayerHost", isMultiplayerHost);
-        if (userId != null && sessionId == null) {
-            UserQuizAttempt activeAttempt = attemptRepository
-                    .findTopByUserIdAndQuizIdAndSessionIdIsNullAndIsCompletedFalseOrderByIdDesc(userId, quizId);
-            model.addAttribute("activeAttemptId", activeAttempt != null ? activeAttempt.getId() : null);
-        }
-        if (userId != null) {
-            userRepository.findById(userId)
-                    .map(org.example.model.User::getLogin)
-                    .ifPresent(login -> model.addAttribute("currentUsername", login));
-        }
-
+        populateQuizPage(model, quizId, userId, sessionId, false);
         return "quiz";
     }
 
@@ -593,60 +569,7 @@ public class PageController {
             return renderNotFound(response, model);
         }
 
-        QuizDTO quiz = null;
-        LeaderboardDTO leaderboard = null;
-        boolean hasQuestions = false;
-
-        try {
-            QuizDetailsDTO quizDetails = quizService.getQuiz(quizId, userId);
-            hasQuestions = quizDetails.questions() != null && !quizDetails.questions().isEmpty();
-            quiz = new QuizDTO(
-                quizDetails.id(),
-                quizDetails.name(),
-                quizDetails.author(),
-                quizDetails.questions() != null ? quizDetails.questions().size() : 0,
-                quizDetails.timeLimit(),
-                quizDetails.timePerQuestion(),
-                quizDetails.isPublic(),
-                quizDetails.isStatic(),
-                quizDetails.createdAt()
-            );
-        } catch (Exception e) {
-            log.debug("Не удалось загрузить карточку квиза {}", quizId, e);
-        }
-
-        try {
-            leaderboard = quizService.getQuizLeaderboard(quizId, userId, "solo");
-        } catch (Exception e) {
-            log.debug("Не удалось загрузить лидерборд квиза {}", quizId, e);
-        }
-
-        List<QuizDTO> quizzes = quiz != null ? List.of(quiz) : List.of();
-
-        boolean isAdmin = isAdmin(userId);
-        boolean isCreator = isQuizCreator(quizId, userId);
-        boolean isMultiplayerHost = isMultiplayerHost(sessionId, userId);
-
-        model.addAttribute("quizzes", quizzes);
-        model.addAttribute("leaderboard", leaderboard);
-        model.addAttribute("quizId", quizId);
-        model.addAttribute("userId", userId);
-        model.addAttribute("hasQuestions", hasQuestions);
-        model.addAttribute("isAdmin", isAdmin);
-        model.addAttribute("isCreator", isCreator);
-        model.addAttribute("sessionId", sessionId);
-        model.addAttribute("isMultiplayerHost", isMultiplayerHost);
-        if (userId != null && sessionId == null) {
-            UserQuizAttempt activeAttempt = attemptRepository
-                    .findTopByUserIdAndQuizIdAndSessionIdIsNullAndIsCompletedFalseOrderByIdDesc(userId, quizId);
-            model.addAttribute("activeAttemptId", activeAttempt != null ? activeAttempt.getId() : null);
-        }
-        if (userId != null) {
-            userRepository.findById(userId)
-                    .map(org.example.model.User::getLogin)
-                    .ifPresent(login -> model.addAttribute("currentUsername", login));
-        }
-
+        populateQuizPage(model, quizId, userId, sessionId, true);
 
         if ("noQuestions".equals(error)) {
             model.addAttribute("errorMessage", "Этот квиз не содержит вопросов. Невозможно начать прохождение.");
@@ -661,6 +584,54 @@ public class PageController {
         return "quiz";
     }
 
+    private void populateQuizPage(Model model, Long quizId, Long userId, String sessionId,
+                                  boolean showLeaderboardToGuests) {
+        QuizDTO quiz = null;
+        LeaderboardDTO leaderboard = null;
+        boolean hasQuestions = false;
+        boolean hasMaterial = false;
+
+        if (quizId != null) {
+            try {
+                QuizDetailsDTO details = quizService.getQuiz(quizId, userId);
+                hasQuestions = details.questions() != null && !details.questions().isEmpty();
+                hasMaterial = details.materials() != null && !details.materials().isEmpty();
+                quiz = QuizMapper.fromDetails(details);
+            } catch (Exception e) {
+                log.debug("Не удалось загрузить карточку квиза {}", quizId, e);
+            }
+        }
+
+        if (quizId != null && (userId != null || showLeaderboardToGuests)) {
+            try {
+                leaderboard = quizService.getQuizLeaderboard(quizId, userId, "solo");
+            } catch (Exception e) {
+                log.debug("Не удалось загрузить лидерборд квиза {}", quizId, e);
+            }
+        }
+
+        model.addAttribute("quizzes", quiz != null ? List.of(quiz) : List.of());
+        model.addAttribute("leaderboard", leaderboard);
+        model.addAttribute("quizId", quizId);
+        model.addAttribute("userId", userId);
+        model.addAttribute("hasQuestions", hasQuestions);
+        model.addAttribute("hasMaterial", hasMaterial);
+        model.addAttribute("isAdmin", isAdmin(userId));
+        model.addAttribute("isCreator", isQuizCreator(quizId, userId));
+        model.addAttribute("sessionId", sessionId);
+        model.addAttribute("isMultiplayerHost", isMultiplayerHost(sessionId, userId));
+        if (userId != null && sessionId == null) {
+            UserQuizAttempt activeAttempt = attemptRepository
+                    .findTopByUserIdAndQuizIdAndSessionIdIsNullAndIsCompletedFalseOrderByIdDesc(userId, quizId);
+            model.addAttribute("activeAttemptId", activeAttempt != null ? activeAttempt.getId() : null);
+        }
+        if (userId != null) {
+            userRepository.findById(userId)
+                    .map(org.example.model.User::getLogin)
+                    .ifPresent(login -> model.addAttribute("currentUsername", login));
+        }
+    }
+
     @GetMapping("/quiz/{quizId}/details")
     public String quizDetails(@PathVariable Long quizId,
                               HttpServletRequest request,
@@ -670,7 +641,7 @@ public class PageController {
         if (findAccessibleQuiz(quizId, userId).isEmpty()) {
             return renderNotFound(response, model);
         }
-        QuizDetailsDTO quiz = apiService.getQuiz(quizId, userId);
+        QuizDetailsDTO quiz = apiController.getQuiz(quizId, userId);
         model.addAttribute("quiz", quiz);
         return "quiz-details";
     }
@@ -703,7 +674,7 @@ public class PageController {
                 : quizRepository.searchCreatedQuizzesOrderByCompletedAttemptsDesc(userId, searchQuery, visibilityFilter, attemptsPageRequest))
                 : quizRepository.searchCreatedQuizzes(userId, searchQuery, visibilityFilter, pageRequest);
         List<QuizDTO> createdQuizzes = quizPage.getContent().stream()
-                .map(this::toQuizDTO)
+                .map(QuizMapper::fromEntity)
                 .collect(Collectors.toList());
         List<Long> quizIds = createdQuizzes.stream()
                 .map(QuizDTO::id)
@@ -766,33 +737,6 @@ public class PageController {
             case "public", "private" -> value;
             default -> "all";
         };
-    }
-
-    private QuizDTO toQuizDTO(org.example.model.Quiz quiz) {
-        int questionCount = quiz.getQuestionNumber() != null ? quiz.getQuestionNumber() : 0;
-        Integer timePerQuestionSeconds = null;
-        Integer totalTimeSeconds = null;
-        if (quiz.getTimePerQuestion() != null && quiz.getTimePerQuestion().getSeconds() > 0) {
-            long secondsPerQuestion = quiz.getTimePerQuestion().getSeconds();
-            timePerQuestionSeconds = (int) secondsPerQuestion;
-            if (questionCount > 0) {
-                totalTimeSeconds = (int) (secondsPerQuestion * questionCount);
-            }
-        }
-
-        return new QuizDTO(
-                quiz.getId(),
-                quiz.getName(),
-                quiz.getCreatedBy().getLogin(),
-                questionCount,
-                totalTimeSeconds,
-                timePerQuestionSeconds,
-                !quiz.isPrivate(),
-                quiz.isStatic(),
-                quiz.getCreatedAt() != null
-                        ? java.time.LocalDateTime.ofInstant(quiz.getCreatedAt(), java.time.ZoneId.systemDefault())
-                        : null
-        );
     }
 
     @GetMapping("/quiz/create")
@@ -1021,6 +965,7 @@ public class PageController {
         model.addAttribute("score", result.score());
         model.addAttribute("correctAnswers", result.correctAnswers());
         model.addAttribute("totalQuestions", result.totalQuestions());
+        model.addAttribute("accuracyPercent", result.accuracyPercent());
         model.addAttribute("position", result.position());
         model.addAttribute("timeSpentSeconds", timeSpentSeconds);
         model.addAttribute("formattedTimeSpent", formattedTimeSpent);
@@ -1073,7 +1018,8 @@ public class PageController {
             model.addAttribute("totalQuestions", attemptResponse.totalQuestions());
             model.addAttribute("quizName", attemptResponse.quizName());
             model.addAttribute("quizId", attemptResponse.quizId());
-            model.addAttribute("defaultTimeLimit", attemptResponse.timeRemaining());
+            model.addAttribute("defaultTimeLimit", attemptResponse.currentQuestion().timeLimit() != null
+                    ? attemptResponse.currentQuestion().timeLimit() : 60);
             model.addAttribute("currentQuestionDeadlineEpochMs", attemptResponse.currentQuestionDeadlineEpochMs());
             if (sessionId != null) {
                 model.addAttribute("sessionId", sessionId);
@@ -1101,27 +1047,18 @@ public class PageController {
         }
     }
 
-    @PostMapping("/quiz/{quizId}/attempt/restart")
-    public String restartQuizPage(@PathVariable Long quizId,
-                                  HttpServletRequest request,
-                                  HttpServletResponse response,
-                                  Model model) {
-        Long userId = resolveCurrentUserId(request);
-        if (userId == null || userRepository.findById(userId).isEmpty()) {
-            clearAuthAndRedirectToLogin(response);
-            return "redirect:/login?logout=1";
-        }
-        if (findAccessibleQuiz(quizId, userId).isEmpty()) {
-            return renderNotFound(response, model);
-        }
-
-        return "redirect:/quiz/" + quizId + "/attempt";
-    }
-
     @GetMapping("/quiz/attempt/{attemptId}/question")
     public String quizQuestionPage(@PathVariable Long attemptId,
                                    @RequestParam(required = false) String sessionId,
+                                   HttpServletRequest request,
+                                   HttpServletResponse response,
                                    Model model) {
+        Long userId = resolveCurrentUserId(request);
+        UserQuizAttempt currentAttempt = attemptRepository.findById(attemptId).orElse(null);
+        if (userId == null || currentAttempt == null || currentAttempt.getUser() == null
+                || !userId.equals(currentAttempt.getUser().getId())) {
+            return renderNotFound(response, model);
+        }
         try {
             QuestionDTO nextQuestion = apiController.getNextQuestion(attemptId);
 
@@ -1139,14 +1076,15 @@ public class PageController {
                 return "redirect:/home";
             }
 
-            QuizDetailsDTO quiz = quizService.getQuiz(quizId, null);
+            QuizDetailsDTO quiz = quizService.getQuiz(quizId, userId);
             String quizName = quiz.name();
             AttemptPageProgress progress = attemptService.getAttemptPageProgress(attemptId);
 
             model.addAttribute("questionsRemaining", progress.questionsRemaining());
             model.addAttribute("totalQuestions", progress.totalQuestions());
             model.addAttribute("timeRemaining", progress.timePerQuestionSeconds());
-            model.addAttribute("defaultTimeLimit", progress.timePerQuestionSeconds());
+            model.addAttribute("defaultTimeLimit", nextQuestion.timeLimit() != null
+                    ? nextQuestion.timeLimit() : 60);
             model.addAttribute("currentQuestionDeadlineEpochMs", progress.currentQuestionDeadlineEpochMs());
             model.addAttribute("attemptId", attemptId);
             model.addAttribute("currentQuestion", nextQuestion);

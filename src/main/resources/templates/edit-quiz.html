@@ -527,6 +527,9 @@
         }
     </style>
     <link rel="stylesheet" href="/css/sidebar.css">
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <div class="page">
@@ -565,7 +568,27 @@
                                    maxlength="100">
                         </div>
 
-                        <p class="field-note">Промпт, материал, видимость и тип вопросов после создания квиза не редактируются.</p>
+                        <div class="form-group">
+                            <label for="quizPrompt">Промпт для генерации</label>
+                            <textarea id="quizPrompt" name="prompt" placeholder="Тема или инструкция для генерации вопросов" th:text="${description}"></textarea>
+                            <p class="field-note">Изменение промпта не меняет уже созданные вопросы.</p>
+                        </div>
+                        <div class="option-section">
+                            <span class="group-label">Видимость</span>
+                            <div class="option-grid">
+                                <label class="radio-card">
+                                    <input type="radio" name="visibility" value="public" th:checked="${isPublic == true}">
+                                    <span class="radio-icon"><i data-lucide="globe"></i></span>
+                                    <span class="radio-text"><span class="radio-name">Публичный</span></span>
+                                </label>
+                                <label class="radio-card">
+                                    <input type="radio" name="visibility" value="private" th:checked="${isPublic != true}">
+                                    <span class="radio-icon"><i data-lucide="lock"></i></span>
+                                    <span class="radio-text"><span class="radio-name">Приватный</span></span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="field-note">Загруженный материал сохраняется без изменений.</p>
                     </section>
 
                     <section class="card">
@@ -632,6 +655,36 @@
                                         <span class="radio-name">Случайный</span>
                                         <span class="radio-desc">Случайные вопросы из базы</span>
                                     </span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="option-section">
+                            <span class="group-label">Тип вопросов при будущей генерации</span>
+                            <div class="option-grid three">
+                                <label class="radio-card">
+                                    <input type="radio" name="defaultQuestionType" value="SINGLE_CHOICE" th:checked="${quiz.defaultQuestionType == null or quiz.defaultQuestionType.name() == 'SINGLE_CHOICE'}">
+                                    <span class="radio-icon"><i data-lucide="circle-dot"></i></span>
+                                    <span class="radio-text"><span class="radio-name">Один выбор</span></span>
+                                </label>
+                                <label class="radio-card">
+                                    <input type="radio" name="defaultQuestionType" value="MULTIPLE_CHOICE" th:checked="${quiz.defaultQuestionType != null and quiz.defaultQuestionType.name() == 'MULTIPLE_CHOICE'}">
+                                    <span class="radio-icon"><i data-lucide="square-check"></i></span>
+                                    <span class="radio-text"><span class="radio-name">Несколько ответов</span></span>
+                                </label>
+                                <label class="radio-card">
+                                    <input type="radio" name="defaultQuestionType" value="HUNDRED_TO_ONE" th:checked="${quiz.defaultQuestionType != null and quiz.defaultQuestionType.name() == 'HUNDRED_TO_ONE'}">
+                                    <span class="radio-icon"><i data-lucide="users-round"></i></span>
+                                    <span class="radio-text"><span class="radio-name">100 к 1</span></span>
+                                </label>
+                                <label class="radio-card" th:if="${quiz.defaultQuestionType != null and quiz.defaultQuestionType.name() == 'TEXT'}">
+                                    <input type="radio" name="defaultQuestionType" value="TEXT" checked>
+                                    <span class="radio-icon"><i data-lucide="text-cursor-input"></i></span>
+                                    <span class="radio-text"><span class="radio-name">Текстовый ответ</span></span>
+                                </label>
+                                <label class="radio-card" th:if="${quiz.defaultQuestionType != null and quiz.defaultQuestionType.name() == 'TRUE_FALSE'}">
+                                    <input type="radio" name="defaultQuestionType" value="TRUE_FALSE" checked>
+                                    <span class="radio-icon"><i data-lucide="check-check"></i></span>
+                                    <span class="radio-text"><span class="radio-name">Верно / неверно</span></span>
                                 </label>
                             </div>
                         </div>
@@ -730,9 +783,12 @@
             quizId: parseInt(getQuizId(), 10),
             userId: parseInt(getCurrentUserId(), 10),
             name: formData.get('name').trim(),
+            prompt: formData.get('prompt'),
             questionNumber: parseInt(formData.get('questionNumber'), 10),
             timeLimit: parseInt(formData.get('timeLimit'), 10),
-            isStatic: formData.get('contentType') === 'static'
+            isStatic: formData.get('contentType') === 'static',
+            isPrivate: formData.get('visibility') === 'private',
+            defaultQuestionType: formData.get('defaultQuestionType')
         };
 
         try {

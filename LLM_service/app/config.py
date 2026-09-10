@@ -10,13 +10,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = Field(default="LLM Service", alias="APP_NAME")
     api_key: str = Field(default="", alias="OPENAI_API_KEY")
-    api_base_url: str | None = Field(default=None, alias="OPENAI_BASE_URL")
+    api_base_url: str | None = Field(default="https://polza.ai/api/v1", alias="OPENAI_BASE_URL")
     model_name: str = Field(
-        default="gpt-4.1-mini",
+        default="openai/gpt-6-luna-pro",
         validation_alias=AliasChoices("OPENAI_MODEL", "LLM_MODEL"),
         serialization_alias="OPENAI_MODEL",
     )
-    ethics_model_name: str = Field(default="gpt-4.1-mini", alias="ETHICS_MODEL")
+    ethics_model_name: str = Field(default="openai/gpt-6-luna-pro", alias="ETHICS_MODEL")
     storage_dir: Path = Field(default=Path("storage"), alias="STORAGE_DIR")
     max_upload_size_mb: int = Field(default=30, alias="MAX_UPLOAD_SIZE_MB")
     max_parallel_llm_calls: int = Field(

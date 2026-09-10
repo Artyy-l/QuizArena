@@ -1,10 +1,11 @@
 package org.example.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.example.dto.request.multiplayer.*;
 import org.example.dto.response.multiplayer.MultiplayerResultsDTO;
 import org.example.dto.response.multiplayer.MultiplayerSessionDTO;
 import org.example.dto.response.multiplayer.ParticipantsDTO;
-import org.example.service.JwtService;
+import org.example.security.RequestAuthorization;
 import org.example.service.MultiplayerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,16 +19,18 @@ import java.util.Map;
 public class MultiplayerController {
 
     private final MultiplayerService multiplayerService;
-    private final JwtService jwtService;
+    private final RequestAuthorization authorization;
 
     @Autowired
-    public MultiplayerController(MultiplayerService multiplayerService, JwtService jwtService) {
+    public MultiplayerController(MultiplayerService multiplayerService, RequestAuthorization authorization) {
         this.multiplayerService = multiplayerService;
-        this.jwtService = jwtService;
+        this.authorization = authorization;
     }
 
     @PostMapping("/sessions")
-    public ResponseEntity<MultiplayerSessionDTO> createSession(@RequestBody CreateMultiplayerRequest request) {
+    public ResponseEntity<MultiplayerSessionDTO> createSession(@RequestBody CreateMultiplayerRequest request,
+                                                               HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, request.userId());
         try {
             MultiplayerSessionDTO session = multiplayerService.createMultiplayerSession(request);
             return ResponseEntity.ok(session);
@@ -47,7 +50,9 @@ public class MultiplayerController {
     }
 
     @PostMapping("/sessions/join")
-    public ResponseEntity<?> joinSession(@RequestBody JoinMultiplayerRequest request) {
+    public ResponseEntity<?> joinSession(@RequestBody JoinMultiplayerRequest request,
+                                         HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, request.userId());
         try {
             boolean joined = multiplayerService.joinMultiplayerSession(request);
             return ResponseEntity.ok(joined);
@@ -69,7 +74,9 @@ public class MultiplayerController {
     }
 
     @PostMapping("/sessions/start")
-    public ResponseEntity<?> startSession(@RequestBody StartMultiplayerRequest request) {
+    public ResponseEntity<?> startSession(@RequestBody StartMultiplayerRequest request,
+                                          HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, request.hostUserId());
         try {
             boolean started = multiplayerService.startMultiplayerSession(request);
             return ResponseEntity.ok(started);
@@ -96,7 +103,9 @@ public class MultiplayerController {
     }
 
     @PostMapping("/sessions/cancel")
-    public ResponseEntity<Boolean> cancelSession(@RequestBody CancelMultiplayerRequest request) {
+    public ResponseEntity<Boolean> cancelSession(@RequestBody CancelMultiplayerRequest request,
+                                                 HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, request.hostUserId());
         try {
             boolean cancelled = multiplayerService.cancelMultiplayerSession(request);
             return ResponseEntity.ok(cancelled);
@@ -110,16 +119,10 @@ public class MultiplayerController {
     @GetMapping("/sessions/{sessionId}/progress")
     public ResponseEntity<Map<String, Object>> getProgress(@PathVariable String sessionId,
                                                            @RequestParam(required = false) Long questionId,
-                                                           @RequestParam(required = false) Long userId,
-                                                           jakarta.servlet.http.HttpServletRequest request) {
+                                                           HttpServletRequest request) {
         try {
-            Long currentUserId = userId;
-            if (currentUserId == null) {
-                currentUserId = jwtService.extractUserIdFromRequest(request);
-            }
-            
             Map<String, Object> progress = multiplayerService.getSessionProgress(
-                    sessionId, questionId, currentUserId);
+                    sessionId, questionId, authorization.requireUserId(request));
             return ResponseEntity.ok(progress);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -137,9 +140,15 @@ public class MultiplayerController {
     }
 
     @PostMapping("/sessions/{sessionId}/leave")
-    public ResponseEntity<?> leaveSession(@PathVariable String sessionId, @RequestParam Long userId) {
+    public ResponseEntity<?> leaveSession(@PathVariable String sessionId,
+                                          @RequestParam(required = false) Long userId,
+                                          HttpServletRequest request) {
+        Long currentUserId = authorization.requireUserId(request);
+        if (userId != null) {
+            authorization.requireSameUser(request, userId);
+        }
         try {
-            boolean left = multiplayerService.leaveMultiplayerSession(sessionId, userId);
+            boolean left = multiplayerService.leaveMultiplayerSession(sessionId, currentUserId);
             return ResponseEntity.ok(left);
         } catch (IllegalArgumentException e) {
             return badRequest(e, "Неверные параметры");

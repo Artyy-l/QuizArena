@@ -311,7 +311,7 @@
             overflow-wrap: break-word;
             word-wrap: break-word;
             word-break: normal;
-            hyphens: auto;
+            hyphens: none;
         }
 
         .options-list {
@@ -807,6 +807,25 @@
             border-color: var(--game-red);
             background: linear-gradient(90deg, rgba(203, 61, 123, .38), rgba(93, 27, 73, .5));
             box-shadow: 0 0 20px rgba(255, 108, 174, .35), inset 0 0 28px rgba(255, 108, 174, .14);
+        }
+
+        .option-score {
+            flex: 0 0 auto;
+            margin-left: auto;
+            padding: 7px 11px;
+            border: 1px solid rgba(135, 241, 221, .58);
+            border-radius: 999px;
+            color: #d1fff5;
+            background: rgba(24, 105, 90, .36);
+            font-size: 15px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .option-score.zero {
+            border-color: rgba(202, 198, 235, .4);
+            color: rgba(255, 255, 255, .72);
+            background: rgba(21, 20, 67, .4);
         }
 
         .option-item label,
@@ -1672,6 +1691,9 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body class="page-initializing">
     <div class="sidebar">
@@ -1703,7 +1725,7 @@
                     <div class="progress-item">
                         <div class="progress-label">Осталось времени</div>
                         <div class="progress-value" id="timeRemaining"
-                             th:attr="data-default-time=${defaultTimeLimit != null ? defaultTimeLimit : 60}">
+                             th:attr="data-default-time=${defaultTimeLimit != null ? defaultTimeLimit : 60},data-deadline-epoch-ms=${currentQuestionDeadlineEpochMs}">
                             <i class="time-icon" data-lucide="clock" aria-hidden="true"></i>
                             <span class="time-text" th:text="${timeRemaining} + ' сек'">60 сек</span>
                         </div>
@@ -1944,6 +1966,8 @@
         let attemptId = /*[[${attemptId}]]*/ null;
         let timeRemaining = /*[[${timeRemaining}]]*/ null;
         let timerInterval = null;
+        let questionDeadlineMs = /*[[${currentQuestionDeadlineEpochMs}]]*/ null;
+        let answerSubmissionInProgress = false;
         let questionsRemaining = /*[[${questionsRemaining}]]*/ null;
         let catLeaderboardInterval = null;
         let catLeaderboardLoading = false;
@@ -1951,6 +1975,7 @@
         let catLeaderboardLastRows = [];
         let catLeaderboardHadSuccessfulLoad = false;
         let stakeTimerInterval = null;
+        let stakeSubmissionInProgress = false;
         let stakeTimeLeft = 60;
         const stakeTimerMs = 60000;
 
@@ -2154,7 +2179,7 @@
         async function submitCatStake() {
             var btn = document.getElementById('catBetConfirm');
             var input = document.getElementById('catBetInput');
-            if (!btn || !input) {
+            if (!btn || !input || stakeSubmissionInProgress) {
                 return;
             }
 
@@ -2170,7 +2195,10 @@
                 return;
             }
 
+            stakeSubmissionInProgress = true;
+            stopStakeTimer();
             btn.disabled = true;
+            var stakeSubmitted = false;
             try {
                 var res = await fetch('/api/attempts/stake', {
                     method: 'POST',
@@ -2188,14 +2216,18 @@
                     throw new Error(j.message || 'Ставка отклонена');
                 }
                 var question = await res.json();
+                stakeSubmitted = true;
                 clearStakeDeadline();
-                stopStakeTimer();
                 updateQuestionOnPage(question);
                 if (typeof resetTimer === 'function') resetTimer();
             } catch (e) {
                 showCatBetError(e.message || 'Не удалось подтвердить ставку.');
             } finally {
+                stakeSubmissionInProgress = false;
                 btn.disabled = false;
+                if (!stakeSubmitted && isCatOverlayOpen() && Date.now() < getOrCreateStakeDeadlineMs()) {
+                    startStakeTimer60s();
+                }
             }
         }
 
@@ -2251,6 +2283,9 @@
             if (event) {
                 event.preventDefault();
             }
+            if (answerSubmissionInProgress) {
+                return;
+            }
 
             const currentAttemptId = getAttemptId();
             if (!currentAttemptId) {
@@ -2278,7 +2313,7 @@
             if (isMultiple) {
                 const checked = form ? form.querySelectorAll('input[name="answer"]:checked') : [];
                 selectedAnswerIds = Array.from(checked).map(function (el) { return parseInt(el.value, 10); });
-            } else if (!selectedAnswer && event) {
+            } else if (!selectedAnswer && form) {
                 const formData = new FormData(form);
                 selectedAnswer = formData.get('answer');
             }
@@ -2308,11 +2343,14 @@
                 questionId: currentQuestionId ? parseInt(currentQuestionId, 10) : null
             };
             if (isMultiple) {
-                payload.selectedAnswerIds = isTimeout ? null : selectedAnswerIds;
+                payload.selectedAnswerIds = selectedAnswerIds;
             } else {
                 payload.selectedAnswerId = selectedAnswer ? parseInt(selectedAnswer, 10) : null;
             }
 
+            answerSubmissionInProgress = true;
+            const activeSubmitButton = document.getElementById('submitButton');
+            if (activeSubmitButton) activeSubmitButton.disabled = true;
             try {
                 const response = await fetch('/api/attempts/answer', {
                     method: 'POST',
@@ -2338,19 +2376,27 @@
                     if (submitButton) {
                         if (result.nextQuestion) {
                             setSubmitButtonLabel(submitButton, 'Следующий вопрос');
-                            submitButton.onclick = function(e) {
+                            submitButton.onclick = async function(e) {
                                 e.preventDefault();
-                                if (sessionId) {
-                                    checkMultiplayerProgress();
+                                submitButton.disabled = true;
+                                try {
+                                    const nextResponse = await fetch('/api/attempts/' + attemptId + '/next', {
+                                        headers: { 'Authorization': 'Bearer ' + token }
+                                    });
+                                    if (!nextResponse.ok) throw new Error('Не удалось открыть следующий вопрос');
+                                    const nextQuestion = await nextResponse.json();
+                                    if (sessionId) checkMultiplayerProgress();
+                                    resetAnswerState();
+                                    updateQuestionOnPage(nextQuestion);
+                                    updateQuestionsCounter();
+                                    resetTimer();
+                                    submitButton.onclick = null;
+                                    submitButton.type = 'submit';
+                                } catch (error) {
+                                    showError(error.message || 'Не удалось открыть следующий вопрос');
+                                } finally {
+                                    submitButton.disabled = false;
                                 }
-                                resetAnswerState();
-
-                                updateQuestionOnPage(result.nextQuestion);
-                                updateQuestionsCounter();
-                                resetTimer();
-                                submitButton.onclick = null;
-
-                                submitButton.type = 'submit';
                             };
                             submitButton.type = 'button';
                         } else {
@@ -2398,6 +2444,9 @@
             } catch (error) {
                 console.error('Error:', error);
                 alert('Ошибка сети');
+            } finally {
+                answerSubmissionInProgress = false;
+                if (activeSubmitButton) activeSubmitButton.disabled = false;
             }
         }
 
@@ -2428,6 +2477,19 @@
                 }
             });
 
+            const form = document.getElementById('answerForm');
+            if (form && form.dataset.questionType === 'HUNDRED_TO_ONE' && result.optionScores) {
+                document.querySelectorAll('#optionsList input[name="answer"]').forEach(function (input) {
+                    const score = result.optionScores[input.value];
+                    if (score == null) return;
+                    const optionItem = input.closest('.option-item');
+                    const badge = document.createElement('span');
+                    badge.className = 'option-score' + (Number(score) === 0 ? ' zero' : '');
+                    badge.textContent = formatOptionScore(score);
+                    optionItem.appendChild(badge);
+                });
+            }
+
             const explanationSection = document.getElementById('explanationSection');
             const explanationText = document.getElementById('explanationText');
             if (explanationSection && explanationText) {
@@ -2439,10 +2501,28 @@
                     explanationSection.classList.add('show');
                 }
             }
+            if (window.renderLatex) {
+                window.renderLatex();
+            }
+        }
 
+        function formatOptionScore(rawScore) {
+            const score = Number(rawScore);
+            const value = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(score);
+            const whole = Math.abs(score);
+            const lastTwo = whole % 100;
+            const lastDigit = whole % 10;
+            const ending = !Number.isInteger(score)
+                ? 'балла'
+                : lastTwo !== 11 && lastDigit === 1
+                    ? 'балл'
+                    : (lastTwo < 12 || lastTwo > 14) && lastDigit >= 2 && lastDigit <= 4
+                        ? 'балла' : 'баллов';
+            return value + ' ' + ending;
         }
 
         function resetAnswerState() {
+            document.querySelectorAll('#optionsList .option-score').forEach(badge => badge.remove());
             document.querySelectorAll('.option-item').forEach(item => {
                 item.classList.remove('selected-answer', 'correct-answer', 'selected-wrong');
             });
@@ -2654,7 +2734,7 @@
             var saved = sessionStorage.getItem(key);
             if (saved) {
                 var parsed = parseInt(saved, 10);
-                if (!isNaN(parsed) && parsed > Date.now()) {
+                if (!isNaN(parsed) && parsed > 0) {
                     return parsed;
                 }
             }
@@ -2680,49 +2760,18 @@
             stopQuestionTimer();
             stopStakeTimer();
             var deadlineMs = getOrCreateStakeDeadlineMs();
-            stakeTimeLeft = Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
-            renderStakeTimerText();
-            stakeTimerInterval = setInterval(async function () {
+            function tick() {
                 stakeTimeLeft = Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
                 renderStakeTimerText();
                 if (stakeTimeLeft <= 0) {
-
-                    stakeTimeLeft = 0;
-                    renderStakeTimerText();
                     stopStakeTimer();
-                    // Если пользователь не выбрал ставку, отправляем 0 автоматически.
-                    try {
-                        const rawStake = document.getElementById('catBetInput')?.value;
-                        let autoStake = clampCatStake(rawStake);
-
-                        var res = await fetch('/api/attempts/stake', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
-                            },
-                           body: JSON.stringify({
-                                attemptId: parseInt(getAttemptId(), 10),
-                                stake: autoStake
-                            })
-                        });
-                        if (!res.ok) {
-                            var j = await res.json().catch(function () { return {}; });
-                            throw new Error(j.message || 'Ставка отклонена');
-                        }
-                        var question = await res.json();
-                        clearStakeDeadline();
-                        updateQuestionOnPage(question);
-                        if (typeof resetTimer === 'function') resetTimer();
-                    } catch (e) {
-                        var err = document.getElementById('catBetValidationError');
-                        if (err) {
-                            err.textContent = e.message || 'Не удалось отправить ставку по таймеру';
-                            err.style.display = 'block';
-                        }
-                    }
+                    submitCatStake();
                 }
-            }, 1000);
+            }
+            tick();
+            if (stakeTimeLeft > 0) {
+                stakeTimerInterval = setInterval(tick, 1000);
+            }
         }
 
         function updateQuestionOnPage(question) {
@@ -2763,9 +2812,17 @@
                 form.dataset.questionType = qType;
                 form.dataset.isCatStakeScreen = isStakeScreen ? 'true' : 'false';
             }
+            var timeElement = document.getElementById('timeRemaining');
+            if (timeElement) {
+                timeElement.dataset.defaultTime = String(question.timeLimit || 60);
+            }
             var isMultiple = qType === 'MULTIPLE_CHOICE';
 
             var questionTextElement = document.getElementById('questionText');
+            var optionsList = document.getElementById('optionsList');
+            if (window.MathJax && typeof window.MathJax.typesetClear === 'function') {
+                window.MathJax.typesetClear([questionTextElement, optionsList].filter(Boolean));
+            }
             if (questionTextElement && question.text) {
                 questionTextElement.textContent = question.text;
             }
@@ -2806,6 +2863,9 @@
             if (window.lucide) {
                 lucide.createIcons();
             }
+            if (window.renderLatex) {
+                window.renderLatex();
+            }
         }
 
         function updateQuestionsCounter() {
@@ -2831,10 +2891,7 @@
         }
 
         function resetTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
+            stopQuestionTimer();
 
             if (isCatOverlayOpen()) {
                 return;
@@ -2844,22 +2901,24 @@
             if (timeElement) {
                 const defaultTime = parseInt(timeElement.dataset.defaultTime) || 60;
                 timeRemaining = defaultTime;
-                renderTimeRemaining(timeRemaining);
-                
+                questionDeadlineMs = Date.now() + defaultTime * 1000;
                 startTimer();
             }
         }
 
         function startTimer() {
             const timeElement = document.getElementById('timeRemaining');
-            if (!timeElement || !timeRemaining || isCatOverlayOpen()) return;
+            if (!timeElement || isCatOverlayOpen()) return;
+            stopQuestionTimer();
+            if (!questionDeadlineMs) {
+                questionDeadlineMs = Date.now() + (timeRemaining || 0) * 1000;
+            }
 
-            timerInterval = setInterval(() => {
-                timeRemaining = Math.max(0, timeRemaining - 1);
+            function tick() {
+                timeRemaining = Math.max(0, Math.ceil((questionDeadlineMs - Date.now()) / 1000));
                 renderTimeRemaining(timeRemaining);
                 if (timeRemaining <= 0) {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
+                    stopQuestionTimer();
                     const remainingElement = document.getElementById('questionsRemaining');
                     if (remainingElement) {
                         questionsRemaining = parseInt(remainingElement.textContent) || 0;
@@ -2868,7 +2927,9 @@
                         submitAnswer(null, null);
                     }
                 }
-            }, 1000);
+            }
+            tick();
+            if (timeRemaining > 0) timerInterval = setInterval(tick, 1000);
         }
 
         let sessionId = null;
@@ -2948,9 +3009,7 @@
             }
             
             if (timeElement && !isCatOverlayOpen()) {
-                const defaultTime = parseInt(timeElement.dataset.defaultTime) || 60;
-                timeRemaining = defaultTime;
-                renderTimeRemaining(timeRemaining);
+                timeRemaining = Math.max(0, parseInt(timeRemaining, 10) || 0);
                 startTimer();
             }
 

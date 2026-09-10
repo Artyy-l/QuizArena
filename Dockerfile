@@ -13,7 +13,7 @@ RUN addgroup -S quizarena \
     && chown -R quizarena:quizarena /app
 
 WORKDIR /app
-COPY --from=build /workspace/target/*.jar /app/app.jar
+COPY --from=build /workspace/target/QuizArena-1.0-SNAPSHOT.jar /app/app.jar
 
 ENV JAVA_OPTS=""
 EXPOSE 8081

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
     created_by BIGINT NOT NULL,
     has_material BOOLEAN NOT NULL DEFAULT FALSE,
     material_url VARCHAR(255),
+    material_original_name VARCHAR(255),
     question_number INTEGER,
     time_per_question_seconds INTEGER,
     is_private BOOLEAN NOT NULL DEFAULT FALSE,

@@ -35,6 +35,10 @@ public class Quiz {
   @Column(name = "material_url")
   private String materialUrl;
 
+  /** Исходное имя файла, переданное клиентом и используемое при скачивании. */
+  @Column(name = "material_original_name", length = 255)
+  private String materialOriginalName;
+
   @Column(name = "question_number")
   private Integer questionNumber;
 

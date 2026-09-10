@@ -85,6 +85,22 @@
             gap: 8px;
         }
 
+        .hero-meta .material-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            border: 1px solid rgba(210, 192, 255, .5);
+            border-radius: 12px;
+            color: #fff;
+            text-decoration: none;
+            background: rgba(119, 77, 218, .25);
+        }
+
+        .hero-meta .material-download:hover {
+            background: rgba(119, 77, 218, .45);
+        }
+
         .hero-meta-icon {
             width: 24px;
             height: 24px;
@@ -396,6 +412,9 @@
         }
     </style>
     <link rel="stylesheet" href="/css/sidebar.css">
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <div class="page">
@@ -433,14 +452,27 @@
                            aria-hidden="true"></i>
                         <span th:text="${quizzes[0].isPublic != null and quizzes[0].isPublic ? 'Видимость: публичный' : 'Видимость: приватный'}">Видимость: публичный</span>
                     </span>
+                    <a class="material-download" th:if="${hasMaterial}"
+                       th:href="@{/api/quizzes/{id}/materials/download(id=${quizzes[0].id})}"
+                       aria-label="Скачать материал квиза">
+                        <i class="hero-meta-icon" data-lucide="download" aria-hidden="true"></i>
+                        Скачать материал
+                    </a>
+                    <a class="material-download" href="#" th:onclick="'copyQuiz(event, ' + ${quizzes[0].id} + ')'">
+                        <i class="hero-meta-icon" data-lucide="copy" aria-hidden="true"></i>
+                        Скопировать квиз
+                    </a>
                 </div>
             </div>
             <img class="hero-planet" src="/images/planet.png" alt="">
         </section>
 
         <div th:if="${errorMessage != null}" class="message error-message" th:text="${errorMessage}"></div>
-        <div th:if="${hasQuestions != null and !hasQuestions}" class="message warning-message">
-            Этот квиз не содержит вопросов. Невозможно начать прохождение.
+        <div id="generationMessage"
+             th:if="${hasQuestions != null and !hasQuestions}"
+             class="message warning-message"
+             aria-live="polite">
+            Квиз ещё генерируется. Страница обновится автоматически, когда вопросы будут готовы.
         </div>
 
         <section class="actions" th:if="${quizzes != null and !quizzes.isEmpty()}">
@@ -589,11 +621,7 @@
     }
 
     function submitRestartAttempt(quizId) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/quiz/' + quizId + '/attempt/restart';
-        document.body.appendChild(form);
-        form.submit();
+        window.location.href = '/quiz/' + quizId + '/attempt';
     }
 
     function startMultiplayer(quizId) {
@@ -604,6 +632,94 @@
         }
         window.location.href = '/multiplayer/create?quizId=' + quizId;
     }
+
+    async function copyQuiz(event, quizId) {
+        event.preventDefault();
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+        try {
+            const response = await fetch('/api/quizzes/' + quizId + '/copy', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!response.ok) throw new Error('Не удалось скопировать квиз');
+            const copied = await response.json();
+            window.location.href = '/quiz/' + copied.id;
+        } catch (error) {
+            alert(error.message || 'Не удалось скопировать квиз');
+        }
+    }
+
+    (function initGenerationPolling() {
+        const generationMessage = document.getElementById('generationMessage');
+        if (!generationMessage) return;
+
+        const quizId = getQuizId();
+        if (!quizId) return;
+
+        const pollIntervalMs = 3000;
+        let pollTimer = null;
+        let requestInProgress = false;
+
+        function updateMessage(text) {
+            if (text) {
+                generationMessage.textContent = text;
+            }
+        }
+
+        function stopPolling() {
+            if (pollTimer !== null) {
+                window.clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        async function checkGenerationStatus() {
+            if (requestInProgress) return;
+            const token = localStorage.getItem('token');
+            if (!token) return;
+
+            requestInProgress = true;
+            try {
+                const response = await fetch('/api/quizzes/' + encodeURIComponent(quizId) + '/generation-status', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Accept': 'application/json'
+                    },
+                    cache: 'no-store'
+                });
+
+                if (!response.ok) return;
+
+                const status = await response.json();
+                if (status.status === 'READY') {
+                    stopPolling();
+                    updateMessage('Квиз готов. Обновляем страницу…');
+                    window.location.reload();
+                    return;
+                }
+
+                if (status.status === 'FAILED') {
+                    stopPolling();
+                    updateMessage(status.message || 'Генерация вопросов завершилась с ошибкой.');
+                    return;
+                }
+
+                updateMessage(status.message || 'Квиз ещё генерируется. Страница обновится автоматически, когда вопросы будут готовы.');
+            } catch (error) {
+                // Временная ошибка сети не должна прерывать ожидание завершения генерации.
+            } finally {
+                requestInProgress = false;
+            }
+        }
+
+        checkGenerationStatus();
+        pollTimer = window.setInterval(checkGenerationStatus, pollIntervalMs);
+        window.addEventListener('beforeunload', stopPolling, { once: true });
+    })();
 
     (function initLeaderboardSort() {
         const panes = Array.from(document.querySelectorAll('.leaderboard-pane'));

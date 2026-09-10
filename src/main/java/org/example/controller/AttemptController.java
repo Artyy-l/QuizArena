@@ -1,5 +1,6 @@
 package org.example.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.example.dto.request.attempt.StartAttemptRequest;
 import org.example.dto.request.attempt.SubmitAnswerRequest;
 import org.example.dto.request.attempt.SubmitStakeRequest;
@@ -8,6 +9,7 @@ import org.example.dto.response.attempt.AttemptResponse;
 import org.example.dto.response.attempt.QuizResultDTO;
 import org.example.dto.response.quiz.QuestionDTO;
 import org.example.service.AttemptService;
+import org.example.security.RequestAuthorization;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,14 +19,18 @@ import org.springframework.web.bind.annotation.*;
 public class AttemptController {
 
     private final AttemptService attemptService;
+    private final RequestAuthorization authorization;
 
     @Autowired
-    public AttemptController(AttemptService attemptService) {
+    public AttemptController(AttemptService attemptService, RequestAuthorization authorization) {
         this.attemptService = attemptService;
+        this.authorization = authorization;
     }
 
     @PostMapping("/start")
-    public ResponseEntity<AttemptResponse> startAttempt(@RequestBody StartAttemptRequest request) {
+    public ResponseEntity<AttemptResponse> startAttempt(@RequestBody StartAttemptRequest request,
+                                                        HttpServletRequest httpRequest) {
+        authorization.requireSameUser(httpRequest, request.userId());
         try {
             AttemptResponse response = attemptService.startQuizAttempt(request);
             return ResponseEntity.ok(response);
@@ -36,7 +42,9 @@ public class AttemptController {
     }
 
     @GetMapping("/{attemptId}/next")
-    public ResponseEntity<QuestionDTO> getNextQuestion(@PathVariable Long attemptId) {
+    public ResponseEntity<QuestionDTO> getNextQuestion(@PathVariable Long attemptId,
+                                                       HttpServletRequest request) {
+        authorization.requireAttemptOwner(request, attemptId);
         try {
             QuestionDTO question = attemptService.getNextQuestion(attemptId);
             return question != null ? ResponseEntity.ok(question) : ResponseEntity.noContent().build();
@@ -46,7 +54,9 @@ public class AttemptController {
     }
 
     @PostMapping("/answer")
-    public ResponseEntity<AnswerResponse> submitAnswer(@RequestBody SubmitAnswerRequest request) {
+    public ResponseEntity<AnswerResponse> submitAnswer(@RequestBody SubmitAnswerRequest request,
+                                                       HttpServletRequest httpRequest) {
+        authorization.requireAttemptOwner(httpRequest, request.attemptId());
         try {
             AnswerResponse response = attemptService.submitAnswer(request);
             return ResponseEntity.ok(response);
@@ -56,7 +66,9 @@ public class AttemptController {
     }
 
     @PostMapping("/stake")
-    public ResponseEntity<?> submitStake(@RequestBody SubmitStakeRequest request) {
+    public ResponseEntity<?> submitStake(@RequestBody SubmitStakeRequest request,
+                                         HttpServletRequest httpRequest) {
+        authorization.requireAttemptOwner(httpRequest, request.attemptId());
         try {
             QuestionDTO question = attemptService.submitStake(request);
             return ResponseEntity.ok(question);
@@ -70,7 +82,9 @@ public class AttemptController {
     }
 
     @GetMapping("/{attemptId}/score")
-    public ResponseEntity<?> getCurrentScore(@PathVariable Long attemptId) {
+    public ResponseEntity<?> getCurrentScore(@PathVariable Long attemptId,
+                                             HttpServletRequest request) {
+        authorization.requireAttemptOwner(request, attemptId);
         try {
             double score = attemptService.getCurrentScore(attemptId);
             return ResponseEntity.ok(java.util.Map.of("score", (int) score));
@@ -80,7 +94,9 @@ public class AttemptController {
     }
 
     @PostMapping("/{attemptId}/finish")
-    public ResponseEntity<QuizResultDTO> finishAttempt(@PathVariable Long attemptId) {
+    public ResponseEntity<QuizResultDTO> finishAttempt(@PathVariable Long attemptId,
+                                                       HttpServletRequest request) {
+        authorization.requireAttemptOwner(request, attemptId);
         try {
             QuizResultDTO result = attemptService.finishQuizAttempt(attemptId);
             return ResponseEntity.ok(result);

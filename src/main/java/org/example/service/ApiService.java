@@ -17,11 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 
 @Service
 @Transactional
@@ -33,8 +28,6 @@ public class ApiService implements ApiController {
     private final MultiplayerService multiplayerService;
     private final QuestionGenerationService questionGenerationService;
     
-    private static final String BASE_URL = "http://127.0.0.1:8000/question/";
-    private final HttpClient httpClient;
 
     @Autowired
     public ApiService(AuthService authService,
@@ -49,7 +42,6 @@ public class ApiService implements ApiController {
         this.attemptService = attemptService;
         this.multiplayerService = multiplayerService;
         this.questionGenerationService = questionGenerationService;
-        this.httpClient = HttpClient.newHttpClient();
     }
 
 
@@ -198,14 +190,4 @@ public class ApiService implements ApiController {
         return questionGenerationService.getGeneratedQuestions(questionSetId);
     }
   
-    public String getQuestionsByPrompt(String prompt, int numberOfQuestions) throws IOException, InterruptedException {
-        String url = BASE_URL + prompt + "/" + numberOfQuestions;
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        return response.body();
-    }
 }

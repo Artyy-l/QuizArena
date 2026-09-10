@@ -810,6 +810,9 @@
         }
     </style>
     <link rel="stylesheet" href="/css/sidebar.css">
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <div class="page">
@@ -860,9 +863,9 @@
         <section class="stats">
             <div class="stat">
                 <div class="stat-value"
-                     th:with="accuracy=${totalQuestions != null and totalQuestions > 0 and correctAnswers != null ? (correctAnswers * 100 / totalQuestions) : 0}"
+                     th:with="accuracy=${accuracyPercent != null ? accuracyPercent : (totalQuestions != null and totalQuestions > 0 and correctAnswers != null ? (correctAnswers * 100 / totalQuestions) : 0)}"
                      th:classappend="${accuracy >= 80} ? 'good' : (${accuracy >= 60} ? 'medium' : 'low')"
-                     th:text="${totalQuestions != null and totalQuestions > 0 and correctAnswers != null ? (correctAnswers * 100 / totalQuestions) + '%' : '0%'}">80%</div>
+                     th:text="${accuracy + '%'}">80%</div>
                 <div class="stat-label">Точность</div>
             </div>
             <div class="stat">
@@ -871,7 +874,7 @@
                     <span>/</span>
                     <span th:text="${totalQuestions != null ? totalQuestions : 0}">10</span>
                 </div>
-                <div class="stat-label">Ответы</div>
+                <div class="stat-label">Полностью правильные ответы</div>
             </div>
             <div class="stat">
                 <div class="stat-value">◷ <span th:text="${formattedTimeSpent != null ? formattedTimeSpent : '00:00'}">00:13</span></div>
@@ -1125,11 +1128,7 @@
             window.location.href = '/login';
             return;
         }
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/quiz/' + quizId + '/attempt/restart';
-        document.body.appendChild(form);
-        form.submit();
+        window.location.href = '/quiz/' + quizId + '/attempt';
     }
 
     function startMultiplayer() {

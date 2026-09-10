@@ -2,7 +2,6 @@ package org.example.service;
 
 import org.apache.tika.Tika;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
 
@@ -11,14 +10,6 @@ public class TextExtractorService {
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 60_000;
 
     private final Tika tika = new Tika();
-
-    public String extractText(MultipartFile file) {
-        try {
-            return limitText(tika.parseToString(file.getInputStream()));
-        } catch (Exception e) {
-            throw new RuntimeException("Не удалось извлечь текст из файла: " + e.getMessage(), e);
-        }
-    }
 
     public String extractText(Path file) {
         if (file == null) {

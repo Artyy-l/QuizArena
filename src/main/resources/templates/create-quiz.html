@@ -247,6 +247,35 @@
             line-height: 1.45;
         }
 
+        .safety-status {
+            display: none;
+            margin: 10px 0 0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+
+        .safety-status.show {
+            display: block;
+        }
+
+        .safety-status.checking {
+            color: #665d9b;
+            background: #f4f1ff;
+        }
+
+        .safety-status.safe {
+            color: #147b59;
+            background: #ecfbf4;
+        }
+
+        .safety-status.unsafe {
+            color: #bd174e;
+            background: #fff1f6;
+        }
+
         .number-inputs {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -513,6 +542,9 @@
         }
     </style>
     <link rel="stylesheet" href="/css/sidebar.css">
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <div class="page">
@@ -549,6 +581,7 @@
                                 <textarea id="quizPrompt" name="prompt" maxlength="2900" placeholder="Опишите тему, цели и детали. Чем больше контекста, тем лучше ИИ сгенерирует вопросы." required></textarea>
                                 <span class="char-counter"><span id="promptCounter">0</span>/2900</span>
                             </div>
+                            <p class="safety-status" id="promptSafetyStatus" role="status" aria-live="polite"></p>
                         </div>
 
                         <div class="form-group">
@@ -562,6 +595,7 @@
                                 <input type="file" id="quizMaterial" name="material" accept=".pdf,.txt,.doc,.docx" style="display: none;">
                             </div>
                             <div class="file-name" id="fileName" style="display: none;"></div>
+                            <p class="safety-status" id="materialSafetyStatus" role="status" aria-live="polite"></p>
                             <p class="field-note">Материал поможет ИИ создать более точные и релевантные вопросы.</p>
                         </div>
                     </section>
@@ -715,9 +749,163 @@
 
     const promptInput = document.getElementById('quizPrompt');
     const promptCounter = document.getElementById('promptCounter');
+    const promptSafetyStatus = document.getElementById('promptSafetyStatus');
+    const materialSafetyStatus = document.getElementById('materialSafetyStatus');
+    let promptSafetyTimer = null;
+    let promptSafetyState = { value: null, safe: null };
+    let materialSafetyState = { key: null, safe: null };
+    let promptSafetyRequest = 0;
+    let materialSafetyRequest = 0;
+
+    function setSafetyStatus(element, state, message) {
+        element.className = 'safety-status show ' + state;
+        element.textContent = message;
+    }
+
+    function clearSafetyStatus(element) {
+        element.className = 'safety-status';
+        element.textContent = '';
+    }
+
+    function clearGeneralError() {
+        const errorMessage = document.getElementById('errorMessage');
+        errorMessage.textContent = '';
+        errorMessage.classList.remove('show');
+    }
+
+    function clearGeneralErrorIfSafe() {
+        const promptValue = promptInput.value.trim();
+        const promptSafe = !promptValue
+            || (promptSafetyState.value === promptValue && promptSafetyState.safe === true);
+        const selectedFile = fileInput.files[0];
+        const materialSafe = !selectedFile || selectedFile.size <= 0
+            || (materialSafetyState.key === getMaterialKey(selectedFile)
+                && materialSafetyState.safe === true);
+        if (promptSafe && materialSafe) {
+            clearGeneralError();
+        }
+    }
+
+    function getMaterialKey(file) {
+        return file ? [file.name, file.size, file.lastModified].join(':') : null;
+    }
+
+    async function checkPromptSafety() {
+        const value = promptInput.value.trim();
+        const hasMaterial = fileInput.files.length > 0 && fileInput.files[0].size > 0;
+        const requestId = ++promptSafetyRequest;
+        if (!value) {
+            promptSafetyState = { value, safe: null };
+            clearSafetyStatus(promptSafetyStatus);
+            clearGeneralErrorIfSafe();
+            return true;
+        }
+
+        if (promptSafetyState.value === value && promptSafetyState.hasMaterial === hasMaterial
+                && promptSafetyState.safe !== null) {
+            return promptSafetyState.safe;
+        }
+
+        setSafetyStatus(promptSafetyStatus, 'checking', 'Проверяем безопасность промпта…');
+        try {
+            const formData = new URLSearchParams();
+            formData.set('prompt', value);
+            formData.set('hasMaterial', String(hasMaterial));
+            const response = await fetch('/api/quizzes/safety-check/prompt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
+                },
+                body: formData
+            });
+            const result = await response.json().catch(() => ({}));
+            if (requestId !== promptSafetyRequest
+                    || promptInput.value.trim() !== value
+                    || (fileInput.files.length > 0 && fileInput.files[0].size > 0) !== hasMaterial) {
+                return false;
+            }
+            if (!response.ok) {
+                throw new Error(result.message || 'Проверка промпта временно недоступна');
+            }
+            promptSafetyState = { value, hasMaterial, safe: result.safe === true };
+            setSafetyStatus(
+                promptSafetyStatus,
+                promptSafetyState.safe ? 'safe' : 'unsafe',
+                result.message || (promptSafetyState.safe
+                    ? 'Промпт прошёл проверку безопасности'
+                    : 'Промпт не прошёл проверку безопасности. Измените формулировку')
+            );
+            clearGeneralErrorIfSafe();
+            return promptSafetyState.safe;
+        } catch (error) {
+            if (requestId === promptSafetyRequest && promptInput.value.trim() === value) {
+                promptSafetyState = { value: null, hasMaterial, safe: false };
+                setSafetyStatus(promptSafetyStatus, 'unsafe', error.message || 'Не удалось проверить промпт');
+            }
+            return false;
+        }
+    }
+
+    async function checkMaterialSafety(file) {
+        if (!file || file.size <= 0) {
+            materialSafetyState = { key: null, safe: null };
+            clearSafetyStatus(materialSafetyStatus);
+            clearGeneralErrorIfSafe();
+            return true;
+        }
+        const key = getMaterialKey(file);
+        const requestId = ++materialSafetyRequest;
+        setSafetyStatus(materialSafetyStatus, 'checking', 'Проверяем безопасность материала…');
+        try {
+            const formData = new FormData();
+            formData.append('material', file);
+            const response = await fetch('/api/quizzes/safety-check/material', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
+                },
+                body: formData
+            });
+            const result = await response.json().catch(() => ({}));
+            if (requestId !== materialSafetyRequest || getMaterialKey(fileInput.files[0]) !== key) {
+                return false;
+            }
+            if (!response.ok) {
+                throw new Error(result.message || 'Проверка материала временно недоступна');
+            }
+            materialSafetyState = { key, safe: result.safe === true };
+            setSafetyStatus(
+                materialSafetyStatus,
+                materialSafetyState.safe ? 'safe' : 'unsafe',
+                result.message || (materialSafetyState.safe
+                    ? 'Материал прошёл проверку безопасности'
+                    : 'Материал не прошёл проверку безопасности')
+            );
+            clearGeneralErrorIfSafe();
+            return materialSafetyState.safe;
+        } catch (error) {
+            if (requestId === materialSafetyRequest && getMaterialKey(fileInput.files[0]) === key) {
+                materialSafetyState = { key: null, safe: false };
+                setSafetyStatus(materialSafetyStatus, 'unsafe', error.message || 'Не удалось проверить материал');
+            }
+            return false;
+        }
+    }
+
     promptInput.addEventListener('input', function () {
         promptCounter.textContent = String(promptInput.value.length);
+        clearGeneralError();
+        promptSafetyState = { value: null, safe: null };
+        if (promptInput.value.trim()) {
+            setSafetyStatus(promptSafetyStatus, 'checking', 'Проверка промпта начнётся после ввода…');
+        } else {
+            clearSafetyStatus(promptSafetyStatus);
+        }
+        clearTimeout(promptSafetyTimer);
+        promptSafetyTimer = setTimeout(checkPromptSafety, 700);
     });
+    promptInput.addEventListener('blur', checkPromptSafety);
 
     const fileUploadSection = document.getElementById('fileUploadSection');
     const fileInput = document.getElementById('quizMaterial');
@@ -740,13 +928,17 @@
         fileUploadSection.classList.remove('drag-over');
         if (event.dataTransfer.files.length > 0) {
             fileInput.files = event.dataTransfer.files;
+            clearGeneralError();
             updateFileLabel(event.dataTransfer.files[0].name);
+            checkMaterialSafety(event.dataTransfer.files[0]);
         }
     });
 
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
+            clearGeneralError();
             updateFileLabel(e.target.files[0].name);
+            checkMaterialSafety(e.target.files[0]);
         }
     });
 
@@ -775,6 +967,14 @@
         errorMessage.classList.remove('show');
         submitButton.disabled = true;
 
+        const promptSafe = await checkPromptSafety();
+        const materialSafe = await checkMaterialSafety(fileInput.files[0]);
+        if (!promptSafe || !materialSafe) {
+            showError('Исправьте данные, которые не прошли проверку безопасности.');
+            submitButton.disabled = false;
+            return;
+        }
+
         const quizData = {
             name: formData.get('name'),
             prompt: formData.get('prompt'),
@@ -789,13 +989,29 @@
         };
 
         try {
-            const response = await fetch('/api/quizzes', {
+            const selectedMaterial = fileInput.files[0];
+            const requestUrl = selectedMaterial && selectedMaterial.size > 0
+                ? '/api/quizzes/with-material'
+                : '/api/quizzes';
+            const requestBody = selectedMaterial && selectedMaterial.size > 0
+                ? (() => {
+                    const multipart = new FormData();
+                    multipart.append('quiz', new Blob([JSON.stringify(quizData)], {
+                        type: 'application/json'
+                    }));
+                    multipart.append('material', selectedMaterial);
+                    return multipart;
+                })()
+                : JSON.stringify(quizData);
+            const response = await fetch(requestUrl, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    ...(selectedMaterial && selectedMaterial.size > 0
+                        ? {}
+                        : { 'Content-Type': 'application/json' }),
                     'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
                 },
-                body: JSON.stringify(quizData)
+                body: requestBody
             });
 
             if (!response.ok) {
@@ -812,8 +1028,11 @@
                     errorText = 'Ошибка: ' + response.status;
                 }
 
-                if (errorText.includes('UNETHICAL_PROMPT') || errorText.toLowerCase().includes('неэтич')) {
-                    showError('Данные для создания квиза являются неэтичными.');
+                if (errorText.includes('UNETHICAL_PROMPT')
+                    || errorText.toLowerCase().includes('неэтич')
+                    || errorText.toLowerCase().includes('проверку безопасности')) {
+                    setSafetyStatus(promptSafetyStatus, 'unsafe', errorText);
+                    showError(errorText);
                 } else {
                     showError('Ошибка при создании квиза: ' + errorText);
                 }
@@ -821,24 +1040,6 @@
             }
 
             const result = await response.json();
-            const quizId = result.id ?? result.quizId;
-
-            if (fileInput.files.length > 0 && fileInput.files[0].size > 0) {
-                const fileFormData = new FormData();
-                fileFormData.append('files', fileInput.files[0]);
-                const materialsStatus = await fetch('/api/quizzes/' + quizId + '/materials', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
-                    },
-                    body: fileFormData
-                });
-                if (!materialsStatus.ok) {
-                    showError('Ошибка при загрузке файла.');
-                    return;
-                }
-            }
-
             window.location.href = '/my-quizzes';
         } catch (error) {
             showError('Ошибка сети.');

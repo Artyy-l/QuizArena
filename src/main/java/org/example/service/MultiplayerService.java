@@ -21,14 +21,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class MultiplayerService {
     private final AttemptService attemptService;
-    private final Map<String, SessionState> sessions = new ConcurrentHashMap<>();
     private final MultiplayerSessionRepository sessionRepository;
     @Autowired
     private EntityManager entityManager;
@@ -54,13 +52,6 @@ public class MultiplayerService {
         this.attemptRepository = attemptRepository;
         this.userAnswerRepository = userAnswerRepository;
         this.attemptQuestionRepository = attemptQuestionRepository;
-    }
-
-    private static class SessionState {
-        String sessionId;
-        Long quizId;
-        List<Long> participantIds;
-        Instant startTime;
     }
 
     public MultiplayerSessionDTO createMultiplayerSession(CreateMultiplayerRequest request) {
@@ -230,6 +221,10 @@ public class MultiplayerService {
         if (sessionAttempts.size() < 2) {
             throw new IllegalStateException("Недостаточно участников для начала");
         }
+
+        // Один раз выбираем случайные вопросы и копируем одинаковый упорядоченный
+        // список всем участникам до начала ответов.
+        attemptService.prepareMultiplayerSessionQuestions(sessionIdStr);
 
         session.setStatus("STARTED");
         session.setStartedAt(Instant.now());

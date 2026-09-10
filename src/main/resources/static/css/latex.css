@@ -1,0 +1,16 @@
+/* Keep rendered formulas readable on both regular pages and the game screen. */
+mjx-container[jax="CHTML"] {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.question-text mjx-container,
+.option-item mjx-container,
+.explanation-text mjx-container {
+    margin: 0 0.08em;
+}
+
+.question-text mjx-container[display="true"] {
+    margin: 0.45em auto;
+}

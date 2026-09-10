@@ -11,6 +11,7 @@ import org.example.model.GenerationSet;
 import org.example.model.QuestionType;
 import org.example.model.Quiz;
 import org.example.model.User;
+import org.example.mapper.QuizMapper;
 import org.example.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +26,13 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -38,7 +45,7 @@ import java.util.stream.Collectors;
 @Transactional
 @Slf4j
 public class QuizService {
-    private static final String QUIZ_CACHE_KEY = "quiz:%d";
+    private static final String QUIZ_CACHE_KEY = "quiz:v2:%d";
     private static final String STATUS_READY = "READY";
     private static final String STATUS_FAILED = "FAILED";
     private static final Duration QUIZ_CACHE_TTL = Duration.ofMinutes(30);
@@ -101,6 +108,20 @@ public class QuizService {
         User creator = userRepository.findById(request.createdBy())
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + request.createdBy()));
 
+        boolean hasFile = Boolean.TRUE.equals(request.hasMaterial());
+        if ((request.prompt() == null || request.prompt().trim().isEmpty()) && !hasFile) {
+            throw new IllegalArgumentException("Укажите тему квиза или добавьте материал");
+        }
+        try {
+            // Проверяем безопасность запроса до сохранения, чтобы после отказа
+            // проверки не оставался пустой квиз.
+            questionGenerationService.checkPromptSafety(request.prompt(), hasFile);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new GenerationRetryableException("Проверка безопасности была прервана", e);
+        } catch (IOException e) {
+            throw new GenerationRetryableException("Проверка безопасности временно недоступна", e);
+        }
 
         record CreatedQuiz(Quiz quiz, boolean hasFile) {}
 
@@ -121,7 +142,6 @@ public class QuizService {
 
             quiz = quizRepository.save(quiz);
 
-            boolean hasFile = Boolean.TRUE.equals(request.hasMaterial());
             return new CreatedQuiz(quiz, hasFile);
         });
 
@@ -130,8 +150,6 @@ public class QuizService {
         }
 
         Quiz quiz = createdQuiz.quiz();
-
-        boolean hasFile = createdQuiz.hasFile();
 
         if (request.prompt() != null && !request.prompt().trim().isEmpty() && !hasFile) {
             try {
@@ -159,7 +177,13 @@ public class QuizService {
                 
                 questionGenerationService.generateQuizQuestionsKafka(genRequest);
             } catch (Exception e) {
-                throw new RuntimeException("Ошибка при постановке генерации в очередь: " + e.getMessage(), e);
+                try {
+                    deleteQuiz(new DeleteQuizRequest(quiz.getId(), creator.getId()));
+                } catch (Exception cleanupFailure) {
+                    e.addSuppressed(cleanupFailure);
+                }
+                throw new GenerationRetryableException(
+                        "Не удалось запустить генерацию квиза. Попробуйте ещё раз", e);
             }
         }
 
@@ -183,7 +207,7 @@ public class QuizService {
                 Long quizId = Long.parseLong(query);
                 var quizById = quizRepository.findPublicById(quizId);
                 if (quizById.isPresent()) {
-                    return new QuizSearchResponse(List.of(toQuizDTO(quizById.get())), 0, 1, 1L);
+                    return new QuizSearchResponse(List.of(QuizMapper.fromEntity(quizById.get())), 0, 1, 1L);
                 }
             } catch (NumberFormatException ignored) {
             }
@@ -201,7 +225,7 @@ public class QuizService {
         }
 
         List<QuizDTO> content = page.getContent().stream()
-                .map(this::toQuizDTO)
+                .map(QuizMapper::fromEntity)
                 .collect(Collectors.toList());
 
         return new QuizSearchResponse(
@@ -243,8 +267,9 @@ public class QuizService {
         List<QuizMaterial> materials = new ArrayList<>();
         if (quiz.isHasMaterial() && quiz.getMaterialUrl() != null) {
             String url = quiz.getMaterialUrl();
-            String name = url.substring(url.lastIndexOf('/') + 1);
-            materials = List.of(new QuizMaterial(name, url, null, null));
+            String name = normalizedMaterialName(quiz.getMaterialOriginalName(), url, quizId);
+            materials = List.of(new QuizMaterial(name,
+                    "/api/quizzes/" + quizId + "/materials/download", null, null));
         }
 
         Integer timePerQuestionSeconds = quiz.getTimePerQuestion() != null ? (int) quiz.getTimePerQuestion().getSeconds() : null;
@@ -349,6 +374,18 @@ public class QuizService {
             quiz.setStatic(request.isStatic());
         }
 
+        if (request.prompt() != null) {
+            quiz.setPrompt(request.prompt().trim());
+        }
+
+        if (request.isPrivate() != null) {
+            quiz.setPrivate(request.isPrivate());
+        }
+
+        if (request.defaultQuestionType() != null) {
+            quiz.setDefaultQuestionType(request.defaultQuestionType());
+        }
+
         quiz = quizRepository.save(quiz);
         evictQuizCache(quiz.getId());
 
@@ -423,12 +460,84 @@ public class QuizService {
     }
 
     public void updateQuizMaterialUrl(Long quizId, String materialUrl) {
+        updateQuizMaterialUrl(quizId, materialUrl, null);
+    }
+
+    @Transactional(readOnly = true)
+    public String getQuizPrompt(Long quizId) {
+        return quizRepository.findById(quizId)
+                .orElseThrow(() -> new IllegalArgumentException("Квиз не найден"))
+                .getPrompt();
+    }
+
+    public void updateQuizMaterialUrl(Long quizId, String materialUrl, String originalFilename) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Квиз не найден"));
         
         quiz.setMaterialUrl(materialUrl);
+        if (originalFilename != null && !originalFilename.isBlank()) {
+            quiz.setMaterialOriginalName(sanitizeMaterialName(originalFilename));
+        }
         quiz.setHasMaterial(true);
         quizRepository.save(quiz);
+        evictQuizCache(quizId);
+    }
+
+    @Transactional(readOnly = true)
+    public Path getQuizMaterialPath(Long quizId, Long userId) {
+        return getQuizMaterialDownload(quizId, userId).path();
+    }
+
+    @Transactional(readOnly = true)
+    public QuizMaterialDownload getQuizMaterialDownload(Long quizId, Long userId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new IllegalArgumentException("Квиз не найден"));
+        if (quiz.isPrivate() && !quiz.getCreatedBy().getId().equals(userId)) {
+            throw new SecurityException("Доступ к материалу запрещён");
+        }
+        if (!quiz.isHasMaterial() || quiz.getMaterialUrl() == null || quiz.getMaterialUrl().isBlank()) {
+            throw new IllegalArgumentException("У квиза нет материала");
+        }
+        Path path = fileStorageService.resolveQuizMaterialUrl(quizId, quiz.getMaterialUrl());
+        if (!Files.isRegularFile(path)) {
+            throw new IllegalArgumentException("Материал не найден");
+        }
+        return new QuizMaterialDownload(
+                path,
+                normalizedMaterialName(quiz.getMaterialOriginalName(), quiz.getMaterialUrl(), quizId)
+        );
+    }
+
+    public record QuizMaterialDownload(Path path, String originalFilename) {}
+
+    private String normalizedMaterialName(String storedName, String materialUrl, Long quizId) {
+        String candidate = sanitizeMaterialName(storedName);
+        if (!candidate.isBlank()) {
+            return candidate;
+        }
+        String extension = "";
+        if (materialUrl != null) {
+            int dot = materialUrl.lastIndexOf('.');
+            int slash = materialUrl.lastIndexOf('/');
+            if (dot > slash && dot < materialUrl.length() - 1) {
+                extension = materialUrl.substring(dot);
+            }
+        }
+        return "quiz-" + quizId + "-material" + extension;
+    }
+
+    private String sanitizeMaterialName(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return "";
+        }
+        String normalized = filename.replace('\\', '/');
+        int slash = normalized.lastIndexOf('/');
+        normalized = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+        normalized = normalized.replaceAll("[\\r\\n\\\"]", "_").trim();
+        if (normalized.isBlank() || ".".equals(normalized) || "..".equals(normalized)) {
+            return "";
+        }
+        return normalized.length() > 255 ? normalized.substring(0, 255) : normalized;
     }
 
     public boolean removeQuestionFromQuiz(RemoveQuestionRequest request) {
@@ -452,8 +561,10 @@ public class QuizService {
     }
 
     public LeaderboardDTO getQuizLeaderboard(Long quizId, Long userId, String mode) {
-        if (!quizRepository.existsById(quizId)) {
-            throw new IllegalArgumentException("Квиз не найден");
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new IllegalArgumentException("Квиз не найден"));
+        if (quiz.isPrivate() && !quiz.getCreatedBy().getId().equals(userId)) {
+            throw new SecurityException("Доступ к приватному квизу запрещён");
         }
 
         String normalizedMode = "multiplayer".equalsIgnoreCase(mode) ? "multiplayer" : "solo";
@@ -467,7 +578,7 @@ public class QuizService {
         Pageable pageable = PageRequest.of(0, 10000);
         Page<org.example.model.UserQuizAttempt> attempts = "multiplayer".equals(normalizedMode)
                 ? attemptRepository.findCompletedMultiplayerByQuizIdOrderByScoreDesc(quizId, pageable)
-                : attemptRepository.findCompletedByQuizId(quizId, pageable);
+                : attemptRepository.findCompletedByQuizIdOrderByScoreDesc(quizId, pageable);
         java.util.Map<Long, org.example.model.UserQuizAttempt> bestAttemptsByUser = new java.util.HashMap<>();
         for (org.example.model.UserQuizAttempt attempt : attempts.getContent()) {
             if (attempt.getUser() == null) {
@@ -588,6 +699,10 @@ public class QuizService {
         if (accuracyCompare != 0) {
             return accuracyCompare;
         }
+        int attemptNumberCompare = Integer.compare(getCompletedAttemptNumber(a), getCompletedAttemptNumber(b));
+        if (attemptNumberCompare != 0) {
+            return attemptNumberCompare;
+        }
         return Long.compare(getTimeSpentSeconds(a), getTimeSpentSeconds(b));
     }
 
@@ -632,16 +747,30 @@ public class QuizService {
         if (attempt.getAccuracyPercent() != null) {
             return attempt.getAccuracyPercent();
         }
-        int correctAnswers = (int) userAnswerRepository.countByAttemptIdAndIsCorrectTrue(attempt.getId());
+        List<org.example.model.UserAnswer> answers = userAnswerRepository.findByAttemptId(attempt.getId());
         int totalQuestions = attempt.getQuiz().getQuestionNumber() != null
                 ? attempt.getQuiz().getQuestionNumber()
                 : (int) questionRepository.countByQuizId(attempt.getQuiz().getId());
-        return totalQuestions > 0 ? correctAnswers * 100 / totalQuestions : 0;
+        if (totalQuestions <= 0) {
+            return 0;
+        }
+        // Для старых попыток применяем те же правила, что и для новых завершённых,
+        // включая частичные баллы за вопросы с несколькими вариантами.
+        double accuracySum = answers.stream()
+                .mapToDouble(answer -> answer.getAccuracyRatio() != null
+                        ? answer.getAccuracyRatio()
+                        : Boolean.TRUE.equals(answer.getIsCorrect()) ? 1.0 : 0.0)
+                .sum();
+        return (int) Math.round(accuracySum * 100.0 / totalQuestions);
     }
 
     public QuizResponseDTO copyQuiz(Long quizId, Long newCreatorId) {
         Quiz originalQuiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Квиз не найден"));
+
+        if (originalQuiz.isPrivate() && !originalQuiz.getCreatedBy().getId().equals(newCreatorId)) {
+            throw new SecurityException("Доступ к приватному квизу запрещён");
+        }
 
         User newCreator = userRepository.findById(newCreatorId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
@@ -650,8 +779,9 @@ public class QuizService {
         copiedQuiz.setName(originalQuiz.getName() + " (копия)");
         copiedQuiz.setPrompt(originalQuiz.getPrompt());
         copiedQuiz.setCreatedBy(newCreator);
-        copiedQuiz.setHasMaterial(originalQuiz.isHasMaterial());
-        copiedQuiz.setMaterialUrl(originalQuiz.getMaterialUrl());
+        copiedQuiz.setHasMaterial(false);
+        copiedQuiz.setMaterialUrl(null);
+        copiedQuiz.setMaterialOriginalName(null);
         copiedQuiz.setQuestionNumber(originalQuiz.getQuestionNumber());
         copiedQuiz.setTimePerQuestion(originalQuiz.getTimePerQuestion());
         copiedQuiz.setPrivate(originalQuiz.isPrivate());
@@ -660,6 +790,70 @@ public class QuizService {
         copiedQuiz.setCreatedAt(Instant.now());
 
         copiedQuiz = quizRepository.save(copiedQuiz);
+
+        List<org.example.model.Question> originalQuestions = questionRepository.findByQuizId(quizId);
+        Long copiedGenerationSetId = null;
+        if (!originalQuestions.isEmpty()) {
+            GenerationSet copiedSet = new GenerationSet();
+            copiedSet.setQuiz(copiedQuiz);
+            copiedSet.setPrompt(copiedQuiz.getPrompt());
+            copiedSet.setStatus(STATUS_READY);
+            copiedSet.setGeneratedCount(originalQuestions.size());
+            copiedSet.setValidCount(originalQuestions.size());
+            copiedSet.setDuplicateCount(0);
+            copiedSet.setFinalCount(originalQuestions.size());
+            copiedSet.setCreatedAt(Instant.now());
+            copiedGenerationSetId = generationSetRepository.save(copiedSet).getId();
+        }
+
+        for (org.example.model.Question originalQuestion : originalQuestions) {
+            org.example.model.Question copiedQuestion = new org.example.model.Question();
+            copiedQuestion.setQuiz(copiedQuiz);
+            copiedQuestion.setText(originalQuestion.getText());
+            copiedQuestion.setType(originalQuestion.getType());
+            copiedQuestion.setExplanation(originalQuestion.getExplanation());
+            copiedQuestion.setImage(originalQuestion.getImage() != null
+                    ? originalQuestion.getImage().clone() : null);
+            copiedQuestion.setGenerationSetId(copiedGenerationSetId);
+            for (org.example.model.AnswerOption originalOption :
+                    answerOptionRepository.findByQuestionId(originalQuestion.getId())) {
+                org.example.model.AnswerOption copiedOption = new org.example.model.AnswerOption();
+                copiedOption.setQuestion(copiedQuestion);
+                copiedOption.setText(originalOption.getText());
+                copiedOption.setCorrect(originalOption.isCorrect());
+                copiedOption.setNominal(originalOption.getNominal());
+                copiedQuestion.getAnswerOptions().add(copiedOption);
+            }
+            questionRepository.save(copiedQuestion);
+        }
+
+        if (originalQuiz.getMaterialUrl() != null && !originalQuiz.getMaterialUrl().isBlank()) {
+            Long copiedId = copiedQuiz.getId();
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != STATUS_COMMITTED) {
+                            try {
+                                fileStorageService.deleteQuizMaterials(copiedId);
+                            } catch (IOException e) {
+                                log.warn("Не удалось удалить материал незавершённой копии квиза {}", copiedId, e);
+                            }
+                        }
+                    }
+                });
+            }
+            try {
+                copiedQuiz.setMaterialUrl(fileStorageService.copyQuizMaterial(
+                        quizId, copiedId, originalQuiz.getMaterialUrl()));
+                copiedQuiz.setMaterialOriginalName(
+                        sanitizeMaterialName(originalQuiz.getMaterialOriginalName()));
+                copiedQuiz.setHasMaterial(true);
+                quizRepository.save(copiedQuiz);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Не удалось скопировать материал квиза", e);
+            }
+        }
 
         return new QuizResponseDTO(
                 copiedQuiz.getId(),
@@ -711,32 +905,6 @@ public class QuizService {
         
         Sort sort = Sort.by(direction, sortField);
         return PageRequest.of(pageNumber, pageSize, sort);
-    }
-
-    private QuizDTO toQuizDTO(Quiz quiz) {
-        int questionCount = quiz.getQuestionNumber() != null ? quiz.getQuestionNumber() : 0;
-        
-        Integer totalTimeSeconds = null;
-        Integer timePerQuestionSeconds = null;
-        if (quiz.getTimePerQuestion() != null && quiz.getTimePerQuestion().getSeconds() > 0) {
-            long secondsPerQuestion = quiz.getTimePerQuestion().getSeconds();
-            timePerQuestionSeconds = (int) secondsPerQuestion;
-            if (questionCount > 0) {
-                totalTimeSeconds = (int) (secondsPerQuestion * questionCount);
-            }
-        }
-        
-        return new QuizDTO(
-                quiz.getId(),
-                quiz.getName(),
-                quiz.getCreatedBy().getLogin(),
-                questionCount,
-                totalTimeSeconds,
-                timePerQuestionSeconds,
-                !quiz.isPrivate(),
-                quiz.isStatic(),
-                toLocalDateTime(quiz.getCreatedAt())
-        );
     }
 
     private QuestionDTO toQuestionDTO(org.example.model.Question question) {

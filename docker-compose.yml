@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: quizarena-app:${QUIZARENA_IMAGE_TAG:-local}
+    image: quizarena-app:local
     container_name: quizarena_app
     depends_on:
       postgres:
@@ -16,7 +16,6 @@ services:
         condition: service_healthy
     environment:
       SERVER_PORT: 8081
-      SERVER_FORWARD_HEADERS_STRATEGY: framework
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quizarena}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-quizuser}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-quizpass}
@@ -24,14 +23,15 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       QUIZARENA_ML_BASE_URL: http://llm-service:8000
+      QUIZARENA_ML_REQUEST_TIMEOUT_SECONDS: ${QUIZARENA_ML_REQUEST_TIMEOUT_SECONDS:-900}
       QUIZARENA_JWT_SECRET: ${QUIZARENA_JWT_SECRET:-ZGV2LW9ubHktc2VjcmV0LXBsZWFzZS1jaGFuZ2UtaW4tcHJvZC0zMmJ5dGVzIQ==}
       QUIZARENA_JWT_EXPIRATION_MS: ${QUIZARENA_JWT_EXPIRATION_MS:-86400000}
       QUIZARENA_JWT_ISSUER: ${QUIZARENA_JWT_ISSUER:-quizarena}
-      QUIZARENA_CORS_ALLOWED_ORIGINS: ${QUIZARENA_CORS_ALLOWED_ORIGINS:-http://localhost:8081}
+      QUIZARENA_CORS_ALLOWED_ORIGINS: http://localhost:8081
       FILE_UPLOAD_DIR: /app/uploads
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
     ports:
-      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8081}:8081"
+      - "127.0.0.1:8081:8081"
     volumes:
       - app_uploads:/app/uploads
     healthcheck:
@@ -40,20 +40,19 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
-    restart: unless-stopped
 
   llm-service:
     build:
       context: ./LLM_service
       dockerfile: Dockerfile
-    image: quizarena-llm:${QUIZARENA_IMAGE_TAG:-local}
+    image: quizarena-llm:local
     container_name: quizarena_llm
     environment:
       APP_NAME: LLM Service
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
-      ETHICS_MODEL: ${ETHICS_MODEL:-gpt-4.1-mini}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://polza.ai/api/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-openai/gpt-6-luna-pro}
+      ETHICS_MODEL: ${ETHICS_MODEL:-openai/gpt-6-luna-pro}
       MAX_PARALLEL_LLM_CALLS: ${MAX_PARALLEL_LLM_CALLS:-3}
       WORKER_COUNT: ${WORKER_COUNT:-2}
       REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-180}
@@ -62,7 +61,7 @@ services:
       FORCE_JSON_RESPONSE: ${FORCE_JSON_RESPONSE:-true}
       STORAGE_DIR: /app/storage
     ports:
-      - "${LLM_BIND:-127.0.0.1}:${LLM_PORT:-8000}:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - llm_storage:/app/storage
     healthcheck:
@@ -71,7 +70,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-    restart: unless-stopped
 
   postgres:
     image: postgres:15
@@ -81,7 +79,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-quizuser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quizpass}
     ports:
-      - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -89,32 +87,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: quizarena_redis
     ports:
-      - "${REDIS_BIND:-127.0.0.1}:${REDIS_PORT:-6380}:6379"
+      - "127.0.0.1:6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
 
   kafka:
     image: apache/kafka:3.7.2
     container_name: quizarena_kafka
     hostname: kafka
     ports:
-      - "${KAFKA_BIND:-127.0.0.1}:${KAFKA_HOST_PORT:-9092}:29092"
+      - "127.0.0.1:9092:29092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:${KAFKA_HOST_PORT:-9092}
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
@@ -129,7 +125,6 @@ services:
       timeout: 10s
       retries: 20
       start_period: 30s
-    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:v2.51.2
@@ -140,7 +135,7 @@ services:
       llm-service:
         condition: service_started
     ports:
-      - "${PROMETHEUS_BIND:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -149,7 +144,6 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'
       - '--web.enable-lifecycle'
-    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:10.4.2
@@ -158,15 +152,14 @@ services:
       prometheus:
         condition: service_started
     ports:
-      - "${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
-    restart: unless-stopped
 
 volumes:
   app_uploads:
