@@ -1,0 +1,117 @@
+{
+  "title": "Technical",
+  "uid": "quizarena-technical",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "JVM Heap Used",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\", application=\"quizarena\"})",
+          "legendFormat": "heap used"
+        },
+        {
+          "expr": "sum(jvm_memory_max_bytes{area=\"heap\", application=\"quizarena\"})",
+          "legendFormat": "heap max"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "CPU Usage %",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 }
+      },
+      "targets": [
+        {
+          "expr": "process_cpu_usage{application=\"quizarena\"} * 100",
+          "legendFormat": "java cpu"
+        },
+        {
+          "expr": "rate(process_cpu_seconds_total{job=\"quizarena-python\"}[1m]) * 100",
+          "legendFormat": "python cpu"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HTTP Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"quizarena\"}[1m]))",
+          "legendFormat": "java rps"
+        },
+        {
+          "expr": "sum(rate(http_requests_total{job=\"quizarena-python\"}[1m]))",
+          "legendFormat": "python rps"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "HTTP Error Rate (5xx req/s)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"quizarena\", status=~\"5..\"}[1m]))",
+          "legendFormat": "java errors"
+        },
+        {
+          "expr": "sum(rate(http_requests_total{job=\"quizarena-python\", status_code=~\"5..\"}[1m]))",
+          "legendFormat": "python errors"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "HTTP Latency P95 (seconds)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"quizarena\"}[1m])) by (le))",
+          "legendFormat": "java p95"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"quizarena-python\"}[1m])) by (le))",
+          "legendFormat": "python p95"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "JVM GC Pause Time",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum{application=\"quizarena\"}[1m])",
+          "legendFormat": "{{cause}}"
+        }
+      ]
+    }
+  ]
+}

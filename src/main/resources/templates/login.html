@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авторизация - QuizArena</title>
+    <style>html, body { background-color: #090719; }</style>
+    <link rel="preload" as="image" href="/images/space_for_game.png" fetchpriority="high">
+    <link rel="stylesheet" href="/css/auth.css">
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+<main class="auth-box">
+    <div class="auth-heading">
+        <div class="auth-icon"><i data-lucide="log-in" aria-hidden="true"></i></div>
+        <h1>С возвращением!</h1>
+        <p>Войдите в QuizArena, чтобы продолжить игру.</p>
+    </div>
+    <form id="loginForm">
+        <div class="form-group">
+            <label for="username"><i data-lucide="user-round" aria-hidden="true"></i>Логин</label>
+            <input type="text" id="username" name="username" placeholder="Введите логин" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+            <label for="password"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Пароль</label>
+            <input type="password" id="password" name="password" placeholder="Введите пароль" autocomplete="current-password" required>
+        </div>
+        <div class="error-message" id="errorMessage" role="alert"></div>
+        <div class="auth-actions">
+            <button type="submit" class="primary-btn">Войти</button>
+            <button type="button" class="secondary-btn" onclick="goToRegister()">Зарегистрироваться</button>
+        </div>
+    </form>
+</main>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    if (window.lucide) lucide.createIcons();
+    function goToRegister() {
+        window.location.href = '/register';
+    }
+
+    (function clearClientSessionIfNeeded() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('logout') === '1') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+        }
+    })();
+
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorMessage = document.getElementById('errorMessage');
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                }
+                if (data.userId) {
+                    localStorage.setItem('userId', data.userId);
+                }
+
+                window.location.href = '/home';
+            } else {
+                const error = await response.json();
+                errorMessage.textContent = error.message || 'Неверный логин или пароль';
+                errorMessage.classList.add('show');
+            }
+        } catch (error) {
+            errorMessage.textContent = 'Ошибка сети';
+            errorMessage.classList.add('show');
+            console.error('Error:', error);
+        }
+    });
+</script>
+</body>
+</html>

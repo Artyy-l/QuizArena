@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование профиля - QuizArena</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            min-height: 100vh;
+            color: #0b1230;
+            background: #f7f8ff;
+            font-family: Arial, sans-serif;
+        }
+
+        a { color: inherit; text-decoration: none; }
+
+        button, input { font: inherit; }
+
+        .create-page { min-width: 0; }
+
+        .hero {
+            position: relative;
+            min-height: 405px;
+            padding: 76px 52px 116px;
+            overflow: hidden;
+            color: #fff;
+            background:
+                linear-gradient(90deg, rgba(5, 7, 30, .96), rgba(8, 8, 42, .68)),
+                url('/images/space.png') center / cover no-repeat;
+        }
+
+        .hero h1 {
+            position: relative;
+            z-index: 1;
+            max-width: 560px;
+            font-size: clamp(38px, 4vw, 58px);
+            line-height: 1.02;
+            font-weight: 900;
+            letter-spacing: 0;
+            text-shadow: 0 8px 26px rgba(0, 0, 0, .42);
+        }
+
+        .hero p {
+            position: relative;
+            z-index: 1;
+            max-width: 560px;
+            margin-top: 24px;
+            font-size: 20px;
+            line-height: 1.55;
+        }
+
+        .hero-planet {
+            position: absolute;
+            right: clamp(-150px, -6vw, -72px);
+            bottom: -142px;
+            width: min(900px, 56vw);
+            opacity: .95;
+            filter: drop-shadow(0 24px 30px rgba(104, 52, 224, .42));
+            pointer-events: none;
+        }
+
+        .content {
+            min-width: 0;
+            padding: 24px 42px 30px;
+        }
+        .profile-card {
+            position: relative;
+            z-index: 2;
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 52px 58px 48px;
+            border: 1px solid #e2e4f1;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 22px 50px rgba(29,34,78,.12);
+        }
+
+        .card-title { display: flex; align-items: center; gap: 18px; margin-bottom: 40px; font-size: 29px; font-weight: 900; }
+        .card-title i { display: grid; place-items: center; width: 54px; height: 54px; color: #2f16f4; border-radius: 14px; background: #efeaff; }
+        .form-grid { display: grid; gap: 34px; }
+        .form-group { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 30px; align-items: start; }
+        .field-label { display: flex; align-items: center; gap: 14px; padding-top: 22px; font-size: 19px; font-weight: 800; }
+        .field-label i { color: #2f16f4; }
+        .field-control input { width: 100%; min-height: 76px; padding: 0 24px; border: 1px solid #dfe1ef; border-radius: 14px; color: #0b1230; background: #fff; outline: none; font-size: 19px; transition: border-color .18s ease, box-shadow .18s ease; }
+        .field-control input:focus { border-color: #8065ff; box-shadow: 0 0 0 4px rgba(83,55,244,.12); }
+        .current-value { margin-top: 8px; color: #585a8a; font-size: 14px; }
+        .error-message, .success-message { display: none; margin-top: 8px; font-size: 14px; }
+        .error-message { color: #c53030; }
+        .success-message { color: #16824a; }
+        .error-message.show, .success-message.show { display: block; }
+        .form-feedback { min-height: 20px; margin-top: 12px; }
+        .button-group { display: flex; justify-content: flex-end; gap: 18px; margin-top: 38px; }
+        .button-group button { min-height: 64px; padding: 0 36px; border-radius: 32px; font-size: 18px; font-weight: 800; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
+        .button-group button:hover { transform: translateY(-1px); }
+        .cancel-btn { color: #2f16f4; border: 1px solid #2f16f4; background: #fff; }
+        .submit-btn { color: #fff; border: 0; background: linear-gradient(90deg, #4f6cff, #8d23df); box-shadow: 0 12px 26px rgba(80,47,228,.22); }
+
+        @media (max-width: 960px) {
+            .hero { min-height: 280px; padding: 56px 28px 42px; }
+            .hero-planet { right: -88px; bottom: -72px; width: min(480px, 76vw); opacity: .55; }
+            .content { padding: 20px; }
+            .profile-card { padding: 34px 26px; }
+            .form-group { grid-template-columns: 1fr; gap: 8px; }
+            .field-label { padding-top: 0; }
+        }
+
+        @media (max-width: 560px) {
+            .hero h1 { font-size: 38px; }
+            .hero p { font-size: 16px; }
+            .button-group { flex-direction: column-reverse; }
+            .button-group button { width: 100%; }
+        }
+    </style>
+    <link rel="stylesheet" href="/css/sidebar.css">
+    <link rel="stylesheet" href="/css/latex.css">
+    <script src="/js/latex-render.js"></script>
+<script defer src="/webjars/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+<div class="page">
+    <aside th:replace="~{fragments/sidebar :: sidebar('')}"></aside>
+
+    <main class="create-page">
+        <section class="hero">
+            <div>
+                <h1>Редактирование профиля</h1>
+                <p>Обновите свои данные, чтобы другие пользователи видели актуальную информацию о вас.</p>
+            </div>
+            <img class="hero-planet" src="/images/robot_with_laptop.png" alt="">
+        </section>
+
+        <section class="content">
+            <div class="profile-card">
+                <h2 class="card-title"><i data-lucide="user-round" aria-hidden="true"></i><span>Данные профиля</span></h2>
+                <form id="editProfileForm">
+                    <input type="hidden" id="userId" th:value="${userId}">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="field-label" for="username"><i data-lucide="user-round" aria-hidden="true"></i><span>Новый логин</span></label>
+                            <div class="field-control">
+                                <input type="text" id="username" name="username" placeholder="Введите новый логин">
+                                <div class="current-value">Текущий логин: <span id="currentUsername" th:text="${userProfile != null ? userProfile.username : '—'}">—</span></div>
+                                <div class="error-message" id="usernameError"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="field-label" for="password"><i data-lucide="lock-keyhole" aria-hidden="true"></i><span>Новый пароль</span></label>
+                            <div class="field-control">
+                                <input type="password" id="password" name="password" placeholder="Введите новый пароль">
+                                <div class="error-message" id="passwordError"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="field-label" for="confirmPassword"><i data-lucide="lock-keyhole" aria-hidden="true"></i><span>Подтверждение пароля</span></label>
+                            <div class="field-control">
+                                <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Подтвердите новый пароль">
+                                <div class="error-message" id="confirmPasswordError"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-feedback"><div class="error-message" id="generalError"></div><div class="success-message" id="successMessage"></div></div>
+                    <div class="button-group">
+                        <button type="button" class="cancel-btn" onclick="window.location.href='/home'">Отмена</button>
+                        <button type="submit" class="submit-btn">Сохранить изменения</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    function showMessage(id, message) {
+        const element = document.getElementById(id);
+        element.textContent = message || '';
+        element.classList.toggle('show', Boolean(message));
+    }
+
+    document.getElementById('editProfileForm').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        ['usernameError', 'passwordError', 'confirmPasswordError', 'generalError', 'successMessage'].forEach(id => showMessage(id, ''));
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        const userId = document.getElementById('userId').value;
+        let hasErrors = false;
+
+        if (username && username.length < 3) { showMessage('usernameError', 'Логин должен содержать минимум 3 символа'); hasErrors = true; }
+        if (password && password.length < 6) { showMessage('passwordError', 'Пароль должен содержать минимум 6 символов'); hasErrors = true; }
+        if (password && password !== confirmPassword) { showMessage('confirmPasswordError', 'Пароли не совпадают'); hasErrors = true; }
+        if (hasErrors) return;
+        if (!username && !password) { showMessage('generalError', 'Заполните хотя бы одно поле'); return; }
+
+        const submitButton = document.querySelector('.submit-btn');
+        submitButton.disabled = true;
+        try {
+            const response = await fetch('/api/users/profile', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
+                },
+                body: JSON.stringify({ userId: Number(userId), newUsername: username || null, newPassword: password || null })
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                showMessage('generalError', error.message || 'Ошибка при обновлении профиля');
+                return;
+            }
+            const data = await response.json();
+            showMessage('successMessage', 'Профиль успешно обновлён');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('confirmPassword').value = '';
+            if (data.username) document.getElementById('currentUsername').textContent = data.username;
+        } catch (error) {
+            showMessage('generalError', 'Ошибка сети');
+            console.error(error);
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+
+    if (window.lucide) lucide.createIcons();
+</script>
+</body>
+</html>
